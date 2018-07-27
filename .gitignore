@@ -1,0 +1,24 @@
+
+
+# log
+*.log
+
+
+# jupyter checkpoints
+.ipynb_checkpoints
+
+# csv files
+*.csv
+
+# pyc
+*.pyc
+
+
+# figs
+*.jpg
+*.png
+*.jpeg
+
+# h5
+*.h5
+*.hdf5
