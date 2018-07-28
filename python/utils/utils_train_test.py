@@ -8,6 +8,29 @@ import cv2
 import time
 
 
+# calcualte dice
+def calc_dice(X,Y,d=0):
+    N=X.shape[d]    
+    # intialize dice vector
+    dice=np.zeros([N,1])
+
+    for k in range(N):
+        x=X[k,0] >.5 # convert to logical
+        y =Y[k,0]>.5 # convert to logical
+
+        # number of ones for intersection and union
+        intersectXY=np.sum((x&y==1))
+        unionXY=np.sum(x)+np.sum(y)
+
+        if unionXY!=0:
+            dice[k]=2* intersectXY/(unionXY*1.0)
+            #print 'dice is: %0.2f' %dice[k]
+        else:
+            dice[k]=1
+            #print 'dice is: %0.2f' % dice[k]
+        #print 'processing %d, dice= %0.2f' %(k,dice[k])
+    return np.mean(dice),dice    
+
 def preprocess(X,params):    
     # type of normalization
     norm_type=params['normalization_type']

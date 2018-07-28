@@ -85,9 +85,9 @@ for train_ind, test_ind in skf.split(X,Y):
     else:
         raise IOError('weights does not exist!!!')
     
-    score_test=model.evaluate(utils_train_test.preprocess(X_test,configs.normalization_type),Y_test,verbose=0,batch_size=8)
+    score_test=model.evaluate(utils_train_test.preprocess(X_test,configs.normalizationParams),Y_test,verbose=0,batch_size=8)
     print ('score_test: %.5f' %(score_test))    
-    Y_pred=model.predict(utils_train_test.preprocess(X_test,configs.normalization_type))>=0.5
+    Y_pred=model.predict(utils_train_test.preprocess(X_test,configs.normalizationParams))>=0.5
     dicePerFold,_=utils_train_test.calc_dice(Y_test,Y_pred)
     print('average dice: %.2f' %dicePerFold)
     print ('-' *30)

@@ -102,7 +102,7 @@ if configsDF is None:
     elif img_width<=256:
         inputStride=2
 else:
-    img_hwc=configsDF.loc[configsDF['Name']=='h w c','Value'].tolist()[0]
+    img_hwc=configsDF.loc[configsDF['Name']=='img_hwc','Value'].tolist()[0]
     img_height,img_width,img_channel=ast.literal_eval(img_hwc)
     print('h,w,c loaded from configs!')
 print('img_height,img_width,img_channel: %s,%s,%s' %(img_height,img_width,img_channel))    
@@ -132,10 +132,11 @@ if configsDF is None:
             }
 else:
     # extract normalization type
-    normalization_type=configsDF.loc[configsDF['Name']=='normalization_type','Value'].tolist()[0]
-    print('normalization type loaded from settings!')
-    configsDF=configsDF.loc[configsDF['Name']=='normalizationParams','Value'].tolist()[0]
+    normalizationParams=configsDF.loc[configsDF['Name']=='normalizationParams','Value'].tolist()[0]
     normalizationParams=ast.literal_eval(normalizationParams)# convert string to dict     
+    normalization_type=normalizationParams['normalization_type']
+    print('normalization type loaded from settings!')
+    
     print('normalization params loaded from settings!')
 print(json.dumps(normalizationParams,indent=4,sort_keys=True))    
 print('-'*50)    
@@ -191,14 +192,13 @@ def preprocess(x):
 
 if configsDF is None:
     augmentationParams = dict(samplewise_center=False,
-                         samplewise_center=False,
                          rotation_range=10.,
                          width_shift_range=0.1,
                          height_shift_range=0.1,
                          zoom_range=0.05,
                          )
 else:
-    trainaug_params=configsDF.loc[configsDF['Name']=='augmentationParams','Value'].tolist()[0]
+    augmentationParams=configsDF.loc[configsDF['Name']=='augmentationParams','Value'].tolist()[0]
     augmentationParams=ast.literal_eval(augmentationParams)    
     print('augmentationParams loaded from Configs!')
     print('-'*50)
