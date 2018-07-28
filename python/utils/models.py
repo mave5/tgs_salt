@@ -102,7 +102,7 @@ def model_skip(params):
 
     if reshape4softmax:
         # reshape for softmax
-        output=Reshape((nb_output,h*w)) (conv10)
+        output=Reshape((numOfOutputs,h*w)) (conv10)
         # permute for softmax
         output=Permute((2,1))(output)
         # softmax

@@ -6,7 +6,84 @@ import numpy as np
 import matplotlib.pylab as plt
 import cv2
 import time
+from utils import models
+from sklearn.model_selection import ShuffleSplit
 
+
+def createModel(configs):
+    if configs.model_type=="skip":
+        model = models.model_skip(configs.trainingParams)
+    elif configs.model_type=="encoder_decoder":
+        model = models.model_encoder_decoder(configs.trainingParams)
+    else:
+        raise IOError("%s not found!" %configs.model_type)
+    model.summary()
+    return model
+
+
+def trainNfolds(X,Y,configs):
+    nFolds=configs.nFolds
+    skf = ShuffleSplit(n_splits=nFolds, test_size=configs.test_size, random_state=321)
+    
+    # loop over folds
+    foldnm=0
+    scores_nfolds=[]
+    
+    print ('wait ...')
+    for train_ind, test_ind in skf.split(X,Y):
+        foldnm+=1    
+    
+        train_ind=list(np.sort(train_ind))
+        test_ind=list(np.sort(test_ind))
+        
+        X_train,Y_train=X[train_ind],np.array(Y[train_ind],'uint8')
+        X_test,Y_test=X[test_ind],np.array(Y[test_ind],'uint8')
+        
+        array_stats(X_train)
+        array_stats(Y_train)
+        array_stats(X_test)
+        array_stats(Y_test)
+        print ('-'*30)
+    
+        weightfolder=os.path.join(configs.path2experiment,"fold"+str(foldnm))
+        if  not os.path.exists(weightfolder):
+            os.makedirs(weightfolder)
+            print ('weights folder created')    
+    
+        # path to weights
+        path2weights=os.path.join(weightfolder,"weights.hdf5")
+        
+        # train test on fold #
+        trainingParams=configs.trainingParams
+        trainingParams['foldnm']=foldnm
+        trainingParams['learning_rate']=configs.initialLearningRate
+        trainingParams['weightfolder']=weightfolder
+        trainingParams['path2weights']=path2weights
+
+        # create model        
+        model=createModel(configs)
+        
+        data=X_train,Y_train,X_test,Y_test
+        train_test_model(data,trainingParams,model)
+        
+        # loading best weights from training session
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print ('weights loaded!')
+        else:
+            raise IOError('weights does not exist!!!')
+        
+        score_test=model.evaluate(preprocess(X_test,configs.normalizationParams),Y_test,verbose=0,batch_size=8)
+        print ('score_test: %.5f' %(score_test))    
+        Y_pred=model.predict(preprocess(X_test,configs.normalizationParams))>=0.5
+        dicePerFold,_=calc_dice(Y_test,Y_pred)
+        print('average dice: %.2f' %dicePerFold)
+        print ('-' *30)
+        # store scores for all folds
+        scores_nfolds.append(score_test)
+    
+    print ('average score for %s folds is %s' %(nFolds,np.mean(scores_nfolds)))
+    return
 
 # calcualte dice
 def calc_dice(X,Y,d=0):
