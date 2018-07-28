@@ -8,7 +8,152 @@ import cv2
 import time
 from utils import models
 from sklearn.model_selection import ShuffleSplit
+import pandas as pd
+import datetime
 
+
+def createSubmission(rlcDict,configs):
+    submissionDF = pd.DataFrame.from_dict(rlcDict,orient='index')
+    submissionDF.index.names = ['id']
+    submissionDF.columns = ['rle_mask']    
+
+    # Create submission DataFrame
+    now = datetime.datetime.now()
+    info=configs.experiment
+    suffix = info + '_' + str(now.strftime("%Y-%m-%d-%H-%M"))
+    submissionFolder=os.path.join(configs.path2experiment,"submissions")
+    if not os.path.exists(submissionFolder):
+        os.mkdir(submissionFolder)
+        print(submissionFolder+ ' created!')
+    path2submission = os.path.join(submissionFolder, 'submission_' + suffix + '.csv')
+    print(path2submission)
+    submissionDF.to_csv(path2submission)
+    submissionDF.head()
+    
+
+
+def converMasksToRunLengthDict(Y_leaderboard,ids_leaderboard):
+    print("wait to convert RLC ...")
+    runLengthDict={}
+    for id_ind,id_leader in enumerate(ids_leaderboard):
+        #mask_pred=np.round(Y_leaderboard[id_ind,0]).astype("uint8")
+        mask_pred=Y_leaderboard[id_ind,0].astype("uint8")
+        runLengthMaskPred=runLengthEncoding(mask_pred)
+        id_=id_leader[:-4] # remove .png
+        runLengthDict[id_]=runLengthMaskPred 
+    print("RLC completed!")
+    return runLengthDict        
+
+
+def getOutputAllFolds(X,configs):
+    nFolds=configs.nFolds
+    Y_predAllFolds=[]
+    for foldnm in range(1,nFolds+1):
+        print('fold: %s' %foldnm)
+    
+        Y_pred=getYperFold(X,configs,foldnm)    
+        array_stats(Y_pred)
+        disp_imgs_masks(X,Y_pred>=.5)
+        Y_predAllFolds.append(Y_pred)        
+        print('-'*50)
+        
+    # convert to array
+    Y_predAllFolds=np.hstack(Y_predAllFolds)
+    print ('ensemble shape:', Y_predAllFolds.shape)
+    Y_leaderboard=np.mean(Y_predAllFolds,axis=1)[:,np.newaxis]>=0.5
+    array_stats(Y_leaderboard)
+        
+    return Y_leaderboard        
+
+def getYperFold(X,configs,foldnm):
+    # load weights
+    model=createModel(configs)    
+    weightfolder=os.path.join(configs.path2experiment,"fold"+str(foldnm))
+    
+    # path to weights
+    path2weights=os.path.join(weightfolder,"weights.hdf5")
+    if  os.path.exists(path2weights):
+        model.load_weights(path2weights)
+        print ('%s loaded!' %path2weights)
+    else:
+        raise IOError ('weights does not exist!')
+
+    # prediction
+    Y_pred=model.predict(preprocess(X,configs.normalizationParams))
+    return Y_pred
+
+
+def run_length_decoding(mask_rle, shape):
+    """
+    Based on https://www.kaggle.com/msl23518/visualize-the-stage1-test-solution and modified
+    Args:
+        mask_rle: run-length as string formatted (start length)
+        shape: (height, width) of array to return
+    Returns:
+        numpy array, 1 - mask, 0 - background
+    """
+    s = mask_rle.split()
+    starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]
+    starts -= 1
+    ends = starts + lengths
+    img = np.zeros(shape[1] * shape[0], dtype=np.uint8)
+    for lo, hi in zip(starts, ends):
+        img[lo:hi] = 1
+    return img.reshape((shape[1], shape[0])).T
+
+def run_length_encoding(x):
+    # https://www.kaggle.com/c/data-science-bowl-2018/discussion/48561#
+    bs = np.where(x.T.flatten())[0]
+
+    rle = []
+    prev = -2
+    for b in bs:
+        if (b > prev + 1): rle.extend((b + 1, 0))
+        rle[-1] += 1
+        prev = b
+
+    if len(rle) != 0 and rle[-1] + rle[-2] == x.size:
+        rle[-2] = rle[-2] - 1
+
+    return rle
+
+def runLengthEncoding(img, order='F', format=True):
+    """
+    img is binary mask image, shape (r,c)
+    order is down-then-right, i.e. Fortran
+    format determines if the order needs to be preformatted (according to submission rules) or not
+
+    returns run length as an array or string (if format is True)
+    """
+    bytes = img.reshape(img.shape[0] * img.shape[1], order=order)
+    runs = []  ## list of run lengths
+    r = 0  ## the current run length
+    pos = 1  ## count starts from 1 per WK
+    for c in bytes:
+        if (c == 0):
+            if r != 0:
+                runs.append((pos, r))
+                pos += r
+                r = 0
+            pos += 1
+        else:
+            r += 1
+
+    # if last run is unsaved (i.e. data ends with 1)
+    if r != 0:
+        runs.append((pos, r))
+        pos += r
+        r = 0
+
+    if format:
+        z = ''
+
+        for rr in runs:
+            z += '{} {} '.format(rr[0], rr[1])
+        return z[:-1]
+    else:
+        return runs
+    
 
 def createModel(configs):
     if configs.model_type=="skip":
@@ -311,7 +456,7 @@ def disp_imgs_masks(X,Y,r=2,c=3):
         plt.subplot(r,c,k+1)
         plt.imshow(img,cmap="gray");        
         plt.title(ind)    
-
+    plt.show()
 def array_stats(X):
     X=np.asarray(X)
     print ('array shape: ',X.shape, X.dtype)

@@ -1,14 +1,15 @@
 # train test
 import configs
 from utils import utils_train_test
-import matplotlib.pylab as plt
+#import matplotlib.pylab as plt
 import numpy as np
-from tqdm import tqdm_notebook
-from keras.preprocessing import image
-from sklearn.model_selection import ShuffleSplit
-from utils import models
+import pandas as pd
+#from tqdm import tqdm_notebook
+#from keras.preprocessing import image
+#from sklearn.model_selection import ShuffleSplit
+#from utils import models
 
-#from image import ImageDataGenerator
+
 
 #%%
 
@@ -28,4 +29,26 @@ utils_train_test.disp_imgs_masks(X,Y)
 utils_train_test.trainNfolds(X,Y,configs)
 
 
+# =============================================================================
+# leaderboard data
+# =============================================================================
+X_leaderboard,_,ids_leaderboard=utils_train_test.load_data(configs,"test")
+utils_train_test.array_stats(X_leaderboard)
 
+
+# =============================================================================
+# get leaderboard data
+# =============================================================================
+Y_leaderboard=utils_train_test.getOutputAllFolds(X_leaderboard,configs)
+
+
+# =============================================================================
+# convert outputs to Run Length Dict
+# =============================================================================
+rlcDict=utils_train_test.converMasksToRunLengthDict(Y_leaderboard,ids_leaderboard)    
+  
+
+# =============================================================================
+# crate submission
+# =============================================================================
+utils_train_test.createSubmission(rlcDict,configs)
