@@ -12,6 +12,14 @@ import pandas as pd
 import datetime
 
 
+
+def storePredictions(configs,Y_pred,suffix=""):
+    path2pickle=os.path.join(configs.path2predictions,"Y_pred_"+suffix+".p")    
+    data = { "Y": Y_pred }
+    pickle.dump( data, open( path2pickle, "wb" ) )
+    print("predictions stored!")
+    return
+
 def updateRecoredInConfigs(path2Configs,recordName,recordValue,overwrite=False):
     configsDF=pd.read_csv(path2Configs) # load csv
     NameColumn=configsDF['Name'].as_matrix() # get Name column

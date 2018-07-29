@@ -2,6 +2,7 @@
 import configs
 from utils import utils_train_test
 import numpy as np
+import os
 #import matplotlib.pylab as plt
 #import pandas as pd
 #from tqdm import tqdm_notebook
@@ -44,6 +45,13 @@ evalMatric_nfolds=utils_train_test.trainNfolds(X,Y,configs)
 utils_train_test.updateRecoredInConfigs(configs.path2configs,"nFoldsMetrics",evalMatric_nfolds)
 utils_train_test.updateRecoredInConfigs(configs.path2configs,"avgMetric",np.mean(evalMatric_nfolds))
 
+# =============================================================================
+# Obtain and store predictions of Ensemble model for train data
+# =============================================================================
+X,Y,ids_train=utils_train_test.load_data(configs,"train")
+Y_pred=utils_train_test.getOutputAllFolds(X,configs)
+utils_train_test.storePredictions(configs,Y_pred,"train")
+
 
 # =============================================================================
 # leaderboard data
@@ -57,6 +65,10 @@ utils_train_test.array_stats(X_leaderboard)
 # =============================================================================
 Y_leaderboard=utils_train_test.getOutputAllFolds(X_leaderboard,configs)
 
+# =============================================================================
+# store predictions of Ensemble model for Leaderboard data
+# =============================================================================
+utils_train_test.storePredictions(configs,Y_leaderboard,"leader")
 
 # =============================================================================
 # convert outputs to Run Length Dict
@@ -68,3 +80,7 @@ rlcDict=utils_train_test.converMasksToRunLengthDict(Y_leaderboard,ids_leaderboar
 # crate submission
 # =============================================================================
 utils_train_test.createSubmission(rlcDict,configs)
+
+
+
+

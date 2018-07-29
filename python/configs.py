@@ -79,6 +79,14 @@ if  not os.path.exists(path2experiment):
     os.makedirs(path2experiment) # 0755 is for change owner, chown
     print ('experiment folder created')
 
+# =============================================================================
+# Predictions are stored here
+# =============================================================================
+path2predictions=os.path.join(path2experiment,"predictions")
+if not os.path.exists(path2predictions):
+    os.makedirs(path2predictions)
+    print(path2predictions +" created!")
+
 #==============================================================================
 # Loading Configs as a data frame if exists
 #==============================================================================
@@ -244,7 +252,7 @@ if configsDF is None:
             #'loss': 'categorical_crossentropy',
             'loss': 'binary_crossentropy',
             #"loss": "custom",
-            'nbepoch': 300,
+            'nbepoch': 200,
             'numOfOutputs': 1,
             'initial_channels':numOfInputConvFilters,
             'dropout_rate': 0.5,
