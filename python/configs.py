@@ -26,6 +26,7 @@ projectStage="0"
 agileIterationNum="0" # iteration number
 seed = 2018 # fix random seed for reproducibility
 initialLearningRate=3e-4
+nonZeroMasksOnly=True
 np.random.seed(seed)
 
 
@@ -39,6 +40,7 @@ pre_settings["pre_train"]=pre_train
 pre_settings["image dimension"]=(img_height,img_width,img_channel)
 pre_settings["numOfInputConvFilters"]=numOfInputConvFilters
 pre_settings["initialLearningRate"]=initialLearningRate
+pre_settings["nonZeroMasksOnly"]=nonZeroMasksOnly
 pre_settings["c"]="continue"
 pre_settings["e"]="Exit!"
 
@@ -292,6 +294,8 @@ if configsDF is None:
             'avgMetric': None,
             'test_size': test_size,
             "model_version":experiment,
+            "nonZeroMasksOnly": nonZeroMasksOnly,
+            "pre_settings": pre_settings,
             }
     col1=list(colsDict.keys())
     col2=list(colsDict.values())
@@ -304,5 +308,12 @@ if configsDF is None:
     print('-'*50)
 else:
     print('Configs exists!')
+    nonZeroMasksOnly=configsDF.loc[configsDF['Name']=='nonZeroMasksOnly','Value'].tolist()[0]        
+    if nonZeroMasksOnly=='True':
+        nonZeroMasksOnly=True
+    elif nonZeroMasksOnly=='False':
+        nonZeroMasksOnly=False
+    else:
+        raise IOError('nonZeroMasksOnly not found!')
     
 

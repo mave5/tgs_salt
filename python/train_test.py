@@ -16,13 +16,23 @@ import numpy as np
 # =============================================================================
 # load data    
 # =============================================================================
-X,Y,ids=utils_train_test.load_data(configs,"train")
+X,Y,ids_train=utils_train_test.load_data(configs,"train")
 utils_train_test.array_stats(X)
 utils_train_test.array_stats(Y)
-
 utils_train_test.disp_imgs_masks(X,Y)
 
 
+# =============================================================================
+# pick nonzero images and masks
+# =============================================================================
+if configs.nonZeroMasksOnly:
+    nzMaskIndices=np.where(np.any(Y,axis=(1,2,3)))[0]
+    X=X[nzMaskIndices]
+    Y=Y[nzMaskIndices]
+    utils_train_test.array_stats(X)
+    utils_train_test.array_stats(Y)
+    utils_train_test.disp_imgs_masks(X,Y)
+    
 # =============================================================================
 # train for n-Folds
 # =============================================================================
