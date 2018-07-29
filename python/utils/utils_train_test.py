@@ -12,6 +12,25 @@ import pandas as pd
 import datetime
 
 
+def updateRecoredInConfigs(path2Configs,recordName,recordValue,overwrite=False):
+    configsDF=pd.read_csv(path2Configs) # load csv
+    NameColumn=configsDF['Name'].as_matrix() # get Name column
+    
+    if recordName in NameColumn: # check if recored exists
+        index=configsDF[configsDF['Name']==recordName].index[0] # get the index of the record
+        recordValueLoaded=configsDF.get_value(index,"Value")   # get the record value  
+        if (pd.isnull(recordValueLoaded)) or (overwrite is True): # check if recored value is None
+            configsDF.set_value(index,'Value',recordValue) # update record value
+            configsDF.to_csv(path2Configs,index=False) # store to csv
+            print("record value updated!")
+        else:
+            print("record has values!")
+            print(recordValue)
+    else:
+        print('record does not exist in data frame!')
+    return configsDF            
+
+
 def createSubmission(rlcDict,configs):
     submissionDF = pd.DataFrame.from_dict(rlcDict,orient='index')
     submissionDF.index.names = ['id']

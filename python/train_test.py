@@ -1,9 +1,9 @@
 # train test
 import configs
 from utils import utils_train_test
-#import matplotlib.pylab as plt
 import numpy as np
-import pandas as pd
+#import matplotlib.pylab as plt
+#import pandas as pd
 #from tqdm import tqdm_notebook
 #from keras.preprocessing import image
 #from sklearn.model_selection import ShuffleSplit
@@ -27,7 +27,13 @@ utils_train_test.disp_imgs_masks(X,Y)
 # train for n-Folds
 # =============================================================================
 evalMatric_nfolds=utils_train_test.trainNfolds(X,Y,configs)
-bb
+
+# =============================================================================
+# store/update evaluation metrics in configs
+# =============================================================================
+utils_train_test.updateRecoredInConfigs(configs.path2configs,"nFoldsMetrics",evalMatric_nfolds)
+utils_train_test.updateRecoredInConfigs(configs.path2configs,"avgMetric",np.mean(evalMatric_nfolds))
+
 
 # =============================================================================
 # leaderboard data
