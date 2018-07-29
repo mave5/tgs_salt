@@ -173,6 +173,9 @@ def trainNfolds(X,Y,configs):
     # loop over folds
     foldnm=0
     scores_nfolds=[]
+    evalMatric_nfolds=[]
+    dice_nfolds=[]
+    maskThreshold=0.5
     
     print ('wait ...')
     for train_ind, test_ind in skf.split(X,Y):
@@ -220,15 +223,60 @@ def trainNfolds(X,Y,configs):
         
         score_test=model.evaluate(preprocess(X_test,configs.normalizationParams),Y_test,verbose=0,batch_size=8)
         print ('score_test: %.5f' %(score_test))    
-        Y_pred=model.predict(preprocess(X_test,configs.normalizationParams))>=0.5
+        Y_pred=model.predict(preprocess(X_test,configs.normalizationParams))>=maskThreshold
         dicePerFold,_=calc_dice(Y_test,Y_pred)
+        evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
         print('average dice: %.2f' %dicePerFold)
+        print('eval metric: %.2f' %evalMetricPerFold)
         print ('-' *30)
         # store scores for all folds
         scores_nfolds.append(score_test)
+        dice_nfolds.append(dicePerFold)
+        evalMatric_nfolds.append(evalMetricPerFold)
     
     print ('average score for %s folds is %s' %(nFolds,np.mean(scores_nfolds)))
-    return
+    print ('average dice for %s folds is %s' %(nFolds,np.mean(dice_nfolds)))
+    print ('average eval metric for %s folds is %s' %(nFolds,np.mean(evalMatric_nfolds)))
+    print("-"*50)
+    return evalMatric_nfolds
+
+def computeEvalMetric(Y1,Y2):
+    # Y1 and Y2 shape N*C*H*W
+    assert Y1.shape==Y2.shape
+    N,C,H,W=Y1.shape
+    evalMetric=np.zeros(shape=N)
+    for i in range(N):
+        y1=Y1[i,0]
+        y2=Y2[i,0]
+        evalMetric[i]=computeEvalMetricPerSample(y1,y2)
+        
+    return np.mean(evalMetric),evalMetric    
+    
+def computeEvalMetricPerSample(gt, prediction):
+    thresholds = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    iou = computeIoUperSample(gt, prediction)
+    precisions = [compute_precision_at(iou, th) for th in thresholds]
+    return sum(precisions) / len(precisions)
+    
+
+def compute_precision_at(iou, threshold):
+    tp = iou >= threshold
+    fp= iou < threshold
+    fn= iou < threshold
+    return float(tp) / (tp + fp + fn)
+
+
+def computeIoUperSample(x,y):
+
+    intersectXY=np.sum((x&y==1))
+    unionXY=np.sum(x)+np.sum(y)-intersectXY
+
+    if unionXY!=0.:
+        iou= intersectXY/(unionXY*1.0)
+    else:
+        iou=1.0
+    return iou
+
 
 # calcualte dice
 def calc_dice(X,Y,d=0):

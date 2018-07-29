@@ -26,8 +26,8 @@ utils_train_test.disp_imgs_masks(X,Y)
 # =============================================================================
 # train for n-Folds
 # =============================================================================
-utils_train_test.trainNfolds(X,Y,configs)
-
+evalMatric_nfolds=utils_train_test.trainNfolds(X,Y,configs)
+bb
 
 # =============================================================================
 # leaderboard data
