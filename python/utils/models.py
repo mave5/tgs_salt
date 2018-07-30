@@ -130,24 +130,24 @@ def model_classification(params):
     batchNorm=params['batchNorm']
     w2reg=params['w2reg']
     initStride=params['initStride']
-    
+    padding=params["padding"]
+    padding="same"
     
     inputs = Input((z,h, w))
-    #inputsPadded=ZeroPadding2D(padding=((13,14), (13,14)),data_format="channels_first")(inputs)
-    conv1=conv2dcustom(filters=C,x_input=inputs,strides=initStride,w2reg=w2reg,activation='leaky',data_format=data_format)    
-    pool1=conv2dcustom(filters=C,x_input=conv1,w2reg=w2reg,pool=True,activation='leaky')    
+    conv1=conv2dcustom(filters=C,x_input=inputs,strides=initStride,w2reg=w2reg,activation='leaky',data_format=data_format,padding=padding)    
+    pool1=conv2dcustom(filters=C,x_input=conv1,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
 
-    conv2=conv2dcustom(filters=2*C,x_input=pool1,w2reg=w2reg,activation='leaky')    
-    pool2=conv2dcustom(filters=2*C,x_input=conv2,w2reg=w2reg,pool=True,activation='leaky')    
+    conv2=conv2dcustom(filters=2*C,x_input=pool1,w2reg=w2reg,activation='leaky',padding=padding)    
+    pool2=conv2dcustom(filters=2*C,x_input=conv2,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
     
-    conv3=conv2dcustom(filters=4*C,x_input=pool2,w2reg=w2reg,activation='leaky')    
-    pool3=conv2dcustom(filters=4*C,x_input=conv3,w2reg=w2reg,pool=True,activation='leaky')    
+    conv3=conv2dcustom(filters=4*C,x_input=pool2,w2reg=w2reg,activation='leaky',padding=padding)    
+    pool3=conv2dcustom(filters=4*C,x_input=conv3,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
 
-    conv4=conv2dcustom(filters=8*C,x_input=pool3,w2reg=w2reg,activation='leaky')    
-    pool4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,pool=True,activation='leaky')    
+    conv4=conv2dcustom(filters=8*C,x_input=pool3,w2reg=w2reg,activation='leaky',padding=padding)    
+    pool4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
 
-    conv5=conv2dcustom(filters=16*C,x_input=pool4,w2reg=w2reg,activation='leaky')    
-    conv5=conv2dcustom(filters=16*C,x_input=conv5,w2reg=w2reg,pool=False,activation='leaky')    
+    conv5=conv2dcustom(filters=16*C,x_input=pool4,w2reg=w2reg,activation='leaky',padding=padding)    
+    conv5=conv2dcustom(filters=16*C,x_input=conv5,w2reg=w2reg,pool=False,activation='leaky',padding=padding)    
     
     # flatten
     flattenConv5=Flatten()(conv5)
@@ -164,4 +164,51 @@ def model_classification(params):
     
     return model
 
+
+def model_classification2(params):
+
+    h=params['h']
+    w=params['w']
+    z=params['z']
+    lr=params['learning_rate']
+    loss=params['loss']
+    C=params['initial_channels']
+    numOfOutputs=params['numOfOutputs']
+    dropout_rate=params['dropout_rate']
+    data_format=params["data_format"]
+    batchNorm=params['batchNorm']
+    w2reg=params['w2reg']
+    initStride=params['initStride']
+    padding=params["padding"]
+    
+    inputs = Input((z,h, w))
+    conv1=conv2dcustom(filters=C,x_input=inputs,strides=initStride,w2reg=w2reg,activation='leaky',data_format=data_format,padding=padding)    
+    pool1=conv2dcustom(filters=C,x_input=conv1,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
+
+    conv2=conv2dcustom(filters=2*C,x_input=pool1,w2reg=w2reg,activation='leaky',padding=padding)    
+    pool2=conv2dcustom(filters=2*C,x_input=conv2,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
+    
+    conv3=conv2dcustom(filters=4*C,x_input=pool2,w2reg=w2reg,activation='leaky',padding=padding)    
+    pool3=conv2dcustom(filters=4*C,x_input=conv3,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
+
+    conv4=conv2dcustom(filters=8*C,x_input=pool3,w2reg=w2reg,activation='leaky',padding=padding)    
+    #pool4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
+
+    #conv5=conv2dcustom(filters=16*C,x_input=pool4,w2reg=w2reg,activation='leaky',padding=padding)    
+    #conv5=conv2dcustom(filters=16*C,x_input=conv5,w2reg=w2reg,pool=False,activation='leaky',padding=padding)    
+    
+    # flatten
+    flattenConv5=Flatten()(conv4)
+    
+    # dropout
+    flattenConv5 =Dropout(dropout_rate)(flattenConv5)
+    
+    
+    output=Dense(numOfOutputs,activation="sigmoid")(flattenConv5)
+    
+    model = Model(inputs=inputs, outputs=output)
+
+    model.compile(loss=loss, optimizer=Adam(lr))
+    
+    return model
 

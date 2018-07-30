@@ -5,7 +5,7 @@ import numpy as np
 
 
 #%% model summary
-configs.showModelSummary=False
+configs.showModelSummary=True
 
 # =============================================================================
 # load data    
@@ -55,7 +55,5 @@ rlcDict=utils_train_test.converMasksToRunLengthDict(Y_leaderboard,ids_leaderboar
 # crate submission
 # =============================================================================
 utils_train_test.createSubmission(rlcDict,configs)
-
-
 
 

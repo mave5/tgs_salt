@@ -212,14 +212,8 @@ def runLengthEncoding(img, order='F', format=True):
     
 
 def createModel(configs,showModelSummary=False):
-    if configs.model_type=="model_skip":
-        model = models.model_skip(configs.trainingParams)
-    elif configs.model_type=="encoder_decoder":
-        model = models.model_encoder_decoder(configs.trainingParams)
-    elif configs.model_type=="model_classification":    
-        model = models.model_classification(configs.trainingParams)            
-    else:
-        raise IOError("%s not found!" %configs.model_type)
+    model = getattr(models, configs.model_type)(configs.trainingParams)
+    
     if showModelSummary:
         model.summary()
     return model

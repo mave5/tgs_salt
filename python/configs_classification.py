@@ -158,11 +158,15 @@ print('-'*50)
 #==============================================================================
 # model architecture
 #==============================================================================
-modelArchs={
-        '1': 'encoder_decoder',
-        '2': 'model_skip',
-        "3": "model_classification",
-        }
+from utils import models
+dirModels=dir(models)
+modelArchs={}
+mdu_i=0
+for mdu in dirModels:
+    if "model" in mdu:
+        mdu_i+=1
+        modelArchs[str(mdu_i)]=mdu
+        
 
 if configsDF is None:
     model_type=utils_config.getInputFromUser(modelArchs,"Select a model type:  ")
@@ -274,6 +278,7 @@ if configsDF is None:
             'reshape4softmax': False,
             "data_format": 'channels_first',
             "augmentation": True,
+            "padding": "valid",
             }
 else:
     trainingParams=configsDF.loc[configsDF['Name']=='trainingParams','Value'].tolist()[0]
