@@ -157,10 +157,14 @@ print('-'*50)
 #==============================================================================
 # model architecture
 #==============================================================================
-modelArchs={
-        '1': 'encoder_decoder',
-        '2': 'skip',
-        }
+from utils import models
+dirModels=dir(models)
+modelArchs={}
+mdu_i=0
+for mdu in dirModels:
+    if "model" in mdu:
+        mdu_i+=1
+        modelArchs[str(mdu_i)]=mdu
 
 if configsDF is None:
     model_type=utils_config.getInputFromUser(modelArchs,"Select a model type:  ")
