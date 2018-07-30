@@ -8,6 +8,7 @@ import cv2
 import time
 from utils import models
 from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit
 import pandas as pd
 import datetime
 
@@ -70,6 +71,34 @@ def converMasksToRunLengthDict(Y_leaderboard,ids_leaderboard):
         runLengthDict[id_]=runLengthMaskPred 
     print("RLC completed!")
     return runLengthDict        
+
+
+def getOutputAllFolds_classification(X,configs):
+    nFolds=configs.nFolds
+    y_predAllFolds=[]
+    for foldnm in range(1,nFolds+1):
+        print('fold: %s' %foldnm)
+    
+        y_pred=getYperFold(X,configs,foldnm)    
+        array_stats(y_pred)
+        disp_imgs_masks_labels(X,y_pred>=.5)
+        y_predAllFolds.append(y_pred)        
+        print('-'*50)
+        
+    # convert to array
+    y_predAllFolds=np.hstack(y_predAllFolds)
+    print ('ensemble shape:', y_predAllFolds.shape)
+    y_leaderboard=np.mean(y_predAllFolds,axis=1)[:,np.newaxis]>=configs.binaryThreshold
+    array_stats(y_leaderboard)
+
+    # remember that we concatenated 255*Y_pred_leaderboard 
+    # to the second channel of X_leaderboard.
+    Y_pred=(X[:,1,:]/255).astype("uint8")[:,np.newaxis]
+    for k in range(len(Y_pred)):
+        if y_leaderboard[k,0]==False:
+            Y_pred[k,0]=np.zeros_like(Y_pred[k,0],"uint8")
+    
+    return Y_pred        
 
 
 def getOutputAllFolds(X,configs):
@@ -183,15 +212,81 @@ def runLengthEncoding(img, order='F', format=True):
     
 
 def createModel(configs,showModelSummary=False):
-    if configs.model_type=="skip":
+    if configs.model_type=="model_skip":
         model = models.model_skip(configs.trainingParams)
     elif configs.model_type=="encoder_decoder":
         model = models.model_encoder_decoder(configs.trainingParams)
+    elif configs.model_type=="model_classification":    
+        model = models.model_classification(configs.trainingParams)            
     else:
         raise IOError("%s not found!" %configs.model_type)
     if showModelSummary:
         model.summary()
     return model
+
+
+def trainNfolds_classification(X,Y,configs):
+    nFolds=configs.nFolds
+    skf = StratifiedShuffleSplit(n_splits=nFolds, test_size=configs.test_size, random_state=321)
+    
+    # loop over folds
+    foldnm=0
+    scores_nfolds=[]
+    
+    print ('wait ...')
+    for train_ind, test_ind in skf.split(X,Y):
+        foldnm+=1    
+    
+        train_ind=list(np.sort(train_ind))
+        test_ind=list(np.sort(test_ind))
+        
+        X_train,Y_train=X[train_ind],np.array(Y[train_ind],'uint8')
+        X_test,Y_test=X[test_ind],np.array(Y[test_ind],'uint8')
+        
+        array_stats(X_train)
+        array_stats(Y_train)
+        array_stats(X_test)
+        array_stats(Y_test)
+        print ('-'*30)
+    
+        weightfolder=os.path.join(configs.path2experiment,"fold"+str(foldnm))
+        if  not os.path.exists(weightfolder):
+            os.makedirs(weightfolder)
+            print ('weights folder created')    
+    
+        # path to weights
+        path2weights=os.path.join(weightfolder,"weights.hdf5")
+        
+        # train test on fold #
+        trainingParams=configs.trainingParams
+        trainingParams['foldnm']=foldnm
+        trainingParams['learning_rate']=configs.initialLearningRate
+        trainingParams['weightfolder']=weightfolder
+        trainingParams['path2weights']=path2weights
+
+        # create model        
+        model=createModel(configs,configs.showModelSummary)
+        
+        data=X_train,Y_train,X_test,Y_test
+        train_test_classification(data,trainingParams,model)
+        
+        # loading best weights from training session
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print ('weights loaded!')
+        else:
+            raise IOError('weights does not exist!!!')
+        
+        score_test=model.evaluate(preprocess(X_test,configs.normalizationParams),Y_test,verbose=0,batch_size=8)
+        print ('score_test: %.5f' %(score_test))    
+        print ('-' *30)
+        # store scores for all folds
+        scores_nfolds.append(score_test)
+    
+    print ('average score for %s folds is %s' %(nFolds,np.mean(scores_nfolds)))
+    print("-"*50)
+    return scores_nfolds
+
 
 
 def trainNfolds(X,Y,configs):
@@ -237,7 +332,7 @@ def trainNfolds(X,Y,configs):
         trainingParams['path2weights']=path2weights
 
         # create model        
-        model=createModel(configs)
+        model=createModel(configs,configs.showModelSummary)
         
         data=X_train,Y_train,X_test,Y_test
         train_test_model(data,trainingParams,model)
@@ -388,6 +483,146 @@ def data_generator(X_train,Y_train,batch_size,augmentationParams):
     return train_generator,steps_per_epoch
 
 
+def data_generator_classification(X_train,y_train,batch_size,augmentationParams):
+    image_datagen = ImageDataGenerator(**augmentationParams)
+    
+    seed=1
+    image_datagen.fit(X_train, augment=True, seed=seed)
+    
+    image_generator = image_datagen.flow(X_train,y_train,batch_size=batch_size,seed=seed)
+
+    # combine generators into one which yields image and masks
+    train_generator = image_generator
+    steps_per_epoch=len(X_train)/batch_size    
+
+    return train_generator,steps_per_epoch
+
+
+# train test model
+def train_test_classification(data,params_train,model):
+    X_train,Y_train,X_test,Y_test=data
+    foldnm=params_train['foldnm']  
+    pre_train=params_train['pre_train'] 
+    batch_size=params_train['batch_size'] 
+    augmentation=params_train['augmentation'] 
+    weightfolder=params_train['weightfolder'] 
+    path2weights=params_train['path2weights'] 
+    normalizationParams=params_train["normalizationParams"]
+    augmentationParams=params_train["augmentationParams"]
+    
+    path2model=os.path.join(weightfolder,"model.hdf5")    
+    
+    print('batch_size: %s, Augmentation: %s' %(batch_size,augmentation))
+    print ('fold %s training in progress ...' %foldnm)
+    
+    # load last weights
+    if pre_train== True:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print ('previous weights loaded!')
+        else:
+            raise IOError('weights does not exist!!!')
+    else:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print (path2weights)
+            print ('previous weights loaded!')
+            train_status='previous weights'
+            return train_status
+    
+    # path to csv file to save scores
+    path2scorescsv = os.path.join(weightfolder,'scores.csv')
+    first_row = 'train,test'
+    with open(path2scorescsv, 'w+') as f:
+        f.write(first_row + '\n')
+           
+    # initialize     
+    start_time=time.time()
+    scores_test=[]
+    scores_train=[]
+    if params_train['loss']=='dice': 
+        best_score = 0
+        previous_score = 0
+    else:
+        best_score = 1e6
+        previous_score = 1e6
+    patience = 0
+    
+    # augmentation data generator
+    train_generator,steps_per_epoch=data_generator_classification(X_train,Y_train,batch_size,augmentationParams)
+
+    
+    for epoch in range(params_train['nbepoch']):
+    
+        print ('epoch: %s,  Current Learning Rate: %.1e' %(epoch,model.optimizer.lr.get_value()))
+        #seed = np.random.randint(0, 999999)
+    
+        if augmentation:
+            hist=model.fit_generator(train_generator,steps_per_epoch=steps_per_epoch,epochs=1, verbose=0)
+        else:
+            hist=model.fit(preprocess(X_train,normalizationParams), Y_train, batch_size=batch_size,epochs=1, verbose=0)
+            
+        # evaluate on test and train data
+        score_test=model.evaluate(preprocess(X_test,normalizationParams),Y_test,verbose=0)
+        score_train=np.mean(hist.history['loss'])
+       
+        print ('score_train: %s, score_test: %s' %(score_train,score_test))
+        scores_test=np.append(scores_test,score_test)
+        scores_train=np.append(scores_train,score_train)    
+
+        # check for improvement    
+        if (score_test<=best_score):
+            print ("!!!!!!!!!!!!!!!!!!!!!!!!!!! viva, improvement!!!!!!!!!!!!!!!!!!!!!!!!!!!") 
+            best_score = score_test
+            patience = 0
+            model.save_weights(path2weights)  
+            model.save(path2model)
+            
+        # learning rate schedule
+        if score_test>previous_score:
+            #print "Incrementing Patience."
+            patience += 1
+
+        # learning rate schedule                
+        if patience == params_train['max_patience']:
+            params_train['learning_rate'] = params_train['learning_rate']/2
+            print ("Upating Current Learning Rate to: ", params_train['learning_rate'])
+            model.optimizer.lr.set_value(params_train['learning_rate'])
+            print ("Loading the best weights again. best_score: ",best_score)
+            model.load_weights(path2weights)
+            patience = 0
+        
+        # save current test score
+        previous_score = score_test    
+        
+        # store scores into csv file
+        with open(path2scorescsv, 'a') as f:
+            string = str([score_train,score_test])
+            f.write(string + '\n')
+           
+    
+    print ('model was trained!')
+    elapsed_time=(time.time()-start_time)/60
+    print ('elapsed time: %d  mins' %elapsed_time)      
+
+    # train test progress plots
+    plt.figure(figsize=(10,10))
+    plt.plot(scores_test)
+    plt.plot(scores_train)
+    plt.title('train-validation progress',fontsize=20)
+    plt.legend(('test','train'),fontsize=20)
+    plt.xlabel('epochs',fontsize=20)
+    plt.ylabel('loss',fontsize=20)
+    plt.grid(True)
+    plt.savefig(weightfolder+'/train_val_progress.png')
+    plt.show()
+    
+    print ('training completed!')
+    train_status='completed!'
+    return train_status    
+
+
+
 # train test model
 def train_test_model(data,params_train,model):
     X_train,Y_train,X_test,Y_test=data
@@ -519,6 +754,24 @@ def overlay_contour(img,mask):
     im2, contours, hierarchy = cv2.findContours(mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
     cv2.drawContours(img, contours, -1, (0,255,0), 3)
     return img   
+
+
+def disp_imgs_masks_labels(X,y,r=2,c=3):
+    assert len(X)==len(y)        
+    n=r*c
+    plt.figure(figsize=(12,8))
+    indices=np.random.randint(len(X),size=n)
+    for k,ind in enumerate(indices):
+        img=X[ind,0]
+        mask=X[ind,1]
+        img=overlay_contour(img,mask)    
+        h,w=img.shape
+        label=y[ind]
+        plt.subplot(r,c,k+1)
+        plt.imshow(img,cmap="gray");        
+        plt.text(5,h-5,label,fontsize=12)
+        plt.title(ind)    
+    plt.show()
  
 def disp_imgs_masks(X,Y,r=2,c=3):
     assert np.ndim(X)==np.ndim(Y)        
@@ -539,6 +792,36 @@ def array_stats(X):
     #print 'min: %.3f, max:%.3f, avg: %.3f, std:%.3f' %(np.min(X),np.max(X),np.mean(X),np.std(X))
     print ('min: {}, max: {}, avg: {:.3}, std:{:.3}'.format( np.min(X),np.max(X),np.mean(X),np.std(X)))
     
+
+def load_data_classification(configs,data_type="train"):
+    
+    # loading images and masks
+    path2pickle=os.path.join(configs.path2data,data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        X=data["X"]
+        Y=data["Y"]
+        ids=data["ids"]
+    else:
+        raise IOError(path2pickle+" does not exist!")
+
+    # loading predictions
+    path2pickle=os.path.join(configs.path2data,"Y_pred_"+data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        Y_pred=data["Y"]
+        Y_pred=np.array(Y_pred*255,"uint8") # same range as images
+    else:
+        raise IOError(path2pickle+" does not exist!")
+
+    # concat images and predictions
+    X=np.concatenate((X,Y_pred),axis=1)
+    
+    # conver masks to labels
+    y=np.any(Y,axis=(1,2,3))
+    
+    return X,y,ids
+            
 
 def load_data(configs,data_type="train"):
     path2pickle=os.path.join(configs.path2data,data_type+".p")

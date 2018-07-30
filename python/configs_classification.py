@@ -16,7 +16,7 @@ import json
 # =============================================================================
 # Initial Configs
 # =============================================================================
-img_height,img_width,img_channel=101,101,1 # image dimensions
+img_height,img_width,img_channel=101,101,2 # image dimensions
 numOfInputConvFilters=16 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
@@ -26,7 +26,8 @@ projectStage="0"
 agileIterationNum="0" # iteration number
 seed = 2018 # fix random seed for reproducibility
 initialLearningRate=3e-4
-nonZeroMasksOnly=True
+nonZeroMasksOnly=False # only for segmentation
+binaryThreshold=0.5
 showModelSummary=False
 np.random.seed(seed)
 
@@ -159,7 +160,8 @@ print('-'*50)
 #==============================================================================
 modelArchs={
         '1': 'encoder_decoder',
-        '2': 'skip',
+        '2': 'model_skip',
+        "3": "model_classification",
         }
 
 if configsDF is None:
