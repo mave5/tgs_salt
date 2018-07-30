@@ -192,7 +192,7 @@ def model_classification2(params):
     pool3=conv2dcustom(filters=4*C,x_input=conv3,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
 
     conv4=conv2dcustom(filters=8*C,x_input=pool3,w2reg=w2reg,activation='leaky',padding=padding)    
-    #pool4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
+    conv4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,pool=False,activation='leaky',padding=padding)    
 
     #conv5=conv2dcustom(filters=16*C,x_input=pool4,w2reg=w2reg,activation='leaky',padding=padding)    
     #conv5=conv2dcustom(filters=16*C,x_input=conv5,w2reg=w2reg,pool=False,activation='leaky',padding=padding)    
