@@ -9,7 +9,7 @@ import numpy as np
 #from sklearn.model_selection import ShuffleSplit
 #from utils import models
 
-
+configs.showModelSummary=False
 
 #%%
 
@@ -67,7 +67,7 @@ Y_leaderboard=utils_train_test.getOutputAllFolds(X_leaderboard,configs)
 # =============================================================================
 # store predictions of Ensemble model for Leaderboard data
 # =============================================================================
-utils_train_test.storePredictions(configs,Y_leaderboard,"leader")
+utils_train_test.storePredictions(configs,Y_leaderboard,"test")
 
 # =============================================================================
 # convert outputs to Run Length Dict

@@ -25,7 +25,7 @@ stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
 agileIterationNum="0" # iteration number
 seed = 2018 # fix random seed for reproducibility
-initialLearningRate=3e-4
+initialLearningRate=1e-4
 nonZeroMasksOnly=False # only for segmentation
 binaryThreshold=0.5
 showModelSummary=False
@@ -204,16 +204,18 @@ def preprocess(x):
     meanX=np.mean(x)
     stdX = np.std(x)
     x -= meanX
-    if stdX!=0.0:
+    if stdX>0:
         x /= stdX
     return x
 
 if configsDF is None:
     augmentationParams = dict(samplewise_center=False,
+                              samplewise_std_normalization=False,
                          rotation_range=10.,
                          width_shift_range=0.1,
                          height_shift_range=0.1,
                          zoom_range=0.05,
+                         shear_range=0.1,
                          )
 else:
     augmentationParams=configsDF.loc[configsDF['Name']=='augmentationParams','Value'].tolist()[0]
@@ -256,7 +258,8 @@ if configsDF is None:
             'w': img_width,
             'z':img_channel,
             'learning_rate': initialLearningRate,
-            'optimizer': 'Adam',
+            #'optimizer': 'Adam',
+            'optimizer': 'Nadam',
             #'loss': 'categorical_crossentropy',
             'loss': 'binary_crossentropy',
             #"loss": "custom",
@@ -271,14 +274,14 @@ if configsDF is None:
             'augmentationParams': augmentationParams,
             'batch_size': 8,
             'path2experiment': path2experiment,
-            'w2reg': None,    
+            'w2reg': True, # could to True or None    
             'batchNorm': False,
             'initStride': inputStride,
             'normalizationParams': normalizationParams,
             'reshape4softmax': False,
             "data_format": 'channels_first',
             "augmentation": True,
-            "padding": "valid",
+            "padding": "same",
             }
 else:
     trainingParams=configsDF.loc[configsDF['Name']=='trainingParams','Value'].tolist()[0]

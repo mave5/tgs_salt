@@ -246,7 +246,7 @@ def trainNfolds_classification(X,Y,configs):
         weightfolder=os.path.join(configs.path2experiment,"fold"+str(foldnm))
         if  not os.path.exists(weightfolder):
             os.makedirs(weightfolder)
-            print ('weights folder created')    
+            print (weightfolder +' created')    
     
         # path to weights
         path2weights=os.path.join(weightfolder,"weights.hdf5")
@@ -313,7 +313,7 @@ def trainNfolds(X,Y,configs):
         weightfolder=os.path.join(configs.path2experiment,"fold"+str(foldnm))
         if  not os.path.exists(weightfolder):
             os.makedirs(weightfolder)
-            print ('weights folder created')    
+            print (weightfolder +' created')    
     
         # path to weights
         path2weights=os.path.join(weightfolder,"weights.hdf5")
@@ -506,8 +506,10 @@ def train_test_classification(data,params_train,model):
     
     path2model=os.path.join(weightfolder,"model.hdf5")    
     
+    print("-"*50)
     print('batch_size: %s, Augmentation: %s' %(batch_size,augmentation))
     print ('fold %s training in progress ...' %foldnm)
+    print("-"*50)
     
     # load last weights
     if pre_train== True:

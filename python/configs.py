@@ -18,7 +18,7 @@ import json
 # =============================================================================
 img_height,img_width,img_channel=101,101,1 # image dimensions
 numOfInputConvFilters=16 # number of input conv filters
-pre_train=False # use previous weights or start from scratch
+pre_train=True # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
@@ -28,6 +28,7 @@ seed = 2018 # fix random seed for reproducibility
 initialLearningRate=3e-4
 nonZeroMasksOnly=True
 showModelSummary=False
+numOfEpochs=300
 np.random.seed(seed)
 
 
@@ -42,6 +43,7 @@ pre_settings["image dimension"]=(img_height,img_width,img_channel)
 pre_settings["numOfInputConvFilters"]=numOfInputConvFilters
 pre_settings["initialLearningRate"]=initialLearningRate
 pre_settings["nonZeroMasksOnly"]=nonZeroMasksOnly
+pre_settings["numOfEpochs"]=numOfEpochs
 pre_settings["showModelSummary"]=showModelSummary
 pre_settings["c"]="continue"
 pre_settings["e"]="Exit!"
@@ -197,7 +199,7 @@ print('-'*50)
 #==============================================================================
 # Augmentation parameters
 #==============================================================================
-def preprocess(x):    
+def preprocessing_function(x):
     x=np.array(x,'float32')
     meanX=np.mean(x)
     stdX = np.std(x)
@@ -208,10 +210,12 @@ def preprocess(x):
 
 if configsDF is None:
     augmentationParams = dict(samplewise_center=False,
+                              samplewise_std_normalization=False,
                          rotation_range=10.,
                          width_shift_range=0.1,
                          height_shift_range=0.1,
                          zoom_range=0.05,
+                         shear_range=0.1,
                          )
 else:
     augmentationParams=configsDF.loc[configsDF['Name']=='augmentationParams','Value'].tolist()[0]
@@ -254,11 +258,12 @@ if configsDF is None:
             'w': img_width,
             'z':img_channel,
             'learning_rate': initialLearningRate,
-            'optimizer': 'Adam',
+            #'optimizer': 'Adam',
+            'optimizer': 'Nadam',
             #'loss': 'categorical_crossentropy',
             'loss': 'binary_crossentropy',
             #"loss": "custom",
-            'nbepoch': 200,
+            'nbepoch': numOfEpochs,
             'numOfOutputs': 1,
             'initial_channels':numOfInputConvFilters,
             'dropout_rate': 0.5,
@@ -269,13 +274,14 @@ if configsDF is None:
             'augmentationParams': augmentationParams,
             'batch_size': 8,
             'path2experiment': path2experiment,
-            'w2reg': None,    
+            'w2reg': True, # could be None or True    
             'batchNorm': False,
             'initStride': inputStride,
             'normalizationParams': normalizationParams,
             'reshape4softmax': False,
             "data_format": 'channels_first',
             "augmentation": True,
+            "cropping_padding": (13,14),
             }
 else:
     trainingParams=configsDF.loc[configsDF['Name']=='trainingParams','Value'].tolist()[0]
