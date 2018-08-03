@@ -29,7 +29,7 @@ if configs.nonZeroMasksOnly:
     nzMaskIndices=np.where(np.any(Y,axis=(1,2,3)))[0]
     X=X[nzMaskIndices]
     Y=Y[nzMaskIndices]
-    utils_train_test.array_stats(X)
+    utils_train_test.array_stats(X) 
     utils_train_test.array_stats(Y)
     utils_train_test.disp_imgs_masks(X,Y)
     

@@ -1,9 +1,11 @@
 import re
 import os
-import pandas as pd
+#import pandas as pd
 import sys
 import json
 import csv
+import numpy as np
+
 
 def sort_nicely( l ): 
   """ Sort the given list in the way that humans expect. 

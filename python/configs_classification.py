@@ -199,13 +199,14 @@ print('-'*50)
 #==============================================================================
 # Augmentation parameters
 #==============================================================================
-def preprocess(x):    
+def preprocessing_function(x):
     x=np.array(x,'float32')
-    meanX=np.mean(x)
-    stdX = np.std(x)
-    x -= meanX
-    if stdX>0:
-        x /= stdX
+    for c in range(x.shape[0]):
+        meanX=np.mean(x[c])
+        stdX = np.std(x[c])
+        x[c] -= meanX
+        if stdX!=0.0:
+            x[c] /= stdX
     return x
 
 if configsDF is None:
@@ -216,6 +217,7 @@ if configsDF is None:
                          height_shift_range=0.1,
                          zoom_range=0.05,
                          shear_range=0.1,
+                         preprocessing_function=preprocessing_function,
                          )
 else:
     augmentationParams=configsDF.loc[configsDF['Name']=='augmentationParams','Value'].tolist()[0]

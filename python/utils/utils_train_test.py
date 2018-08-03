@@ -456,7 +456,7 @@ def preprocess(X,params):
         return X
     else:
         raise IOError('no normalization was specified!')
-
+    return X
 
 def data_generator(X_train,Y_train,batch_size,augmentationParams):
     image_datagen = ImageDataGenerator(**augmentationParams)

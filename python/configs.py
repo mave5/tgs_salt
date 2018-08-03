@@ -18,7 +18,7 @@ import json
 # =============================================================================
 img_height,img_width,img_channel=101,101,1 # image dimensions
 numOfInputConvFilters=16 # number of input conv filters
-pre_train=True # use previous weights or start from scratch
+pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
@@ -200,13 +200,23 @@ print('-'*50)
 # Augmentation parameters
 #==============================================================================
 def preprocessing_function(x):
-    x=np.array(x,'float32')
-    meanX=np.mean(x)
-    stdX = np.std(x)
-    x -= meanX
-    if stdX!=0.0:
-        x /= stdX
+    if normalization_type=="zeroMeanUnitStdPerSample":
+        x=np.array(x,'float32')
+        for c in range(x.shape[0]):
+            meanX=np.mean(x[c])
+            x[c] -= meanX
+            stdX = np.std(x[c])
+            if stdX!=0.0:
+                x[c] /= stdX
+    elif normalization_type is None:
+         pass        
+    else:       
+        raise IOError(normalization_type+ " not found!")
+         
     return x
+thismodule = sys.modules[__name__]
+
+pp_func=getattr(thismodule, "preprocessing_function")
 
 if configsDF is None:
     augmentationParams = dict(samplewise_center=False,
@@ -216,10 +226,12 @@ if configsDF is None:
                          height_shift_range=0.1,
                          zoom_range=0.05,
                          shear_range=0.1,
+                         preprocessing_function=pp_func,
                          )
 else:
     augmentationParams=configsDF.loc[configsDF['Name']=='augmentationParams','Value'].tolist()[0]
     augmentationParams=ast.literal_eval(augmentationParams)    
+    augmentationParams["preprocessing_function"]=pp_func
     print('augmentationParams loaded from Configs!')
     print('-'*50)
     
@@ -297,6 +309,7 @@ else:
 #==============================================================================
 
 if configsDF is None:
+    augmentationParams["preprocessing_function"]="preprocessing_function"
     colsDict={
             'model_type':model_type,
             'normalizationParams':normalizationParams,
