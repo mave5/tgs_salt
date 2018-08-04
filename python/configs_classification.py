@@ -293,6 +293,7 @@ if configsDF is None:
             "data_format": 'channels_first',
             "augmentation": True,
             "padding": "same",
+            "activation": "leaky",
             }
 else:
     trainingParams=configsDF.loc[configsDF['Name']=='trainingParams','Value'].tolist()[0]
@@ -300,6 +301,7 @@ else:
     trainingParams['path2experiment']=path2experiment # we over write weightfolder
     trainingParams['pre_train']=pre_train # we over write pre_train value
     trainingParams['normalizationParams']=normalizationParams
+    trainingParams["augmentationParams"]=augmentationParams
     print('params_train loaded from settings!')
     print('-'*50)
     
@@ -325,8 +327,8 @@ if configsDF is None:
             'theano version':utils_config.get_version('theano'),
             'numpy version':utils_config.get_version('numpy'),
             'message':message,
-            'trainingParams':trainingParams,
-            'augmentationParams':augmentationParams,        
+            'trainingParams':trainingParams_csv,
+            'augmentationParams':augmentationParams_csv,        
             'nFoldsMetrics': None,
             'avgMetric': None,
             'test_size': test_size,

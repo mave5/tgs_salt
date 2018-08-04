@@ -29,6 +29,7 @@ initialLearningRate=1e-4
 nonZeroMasksOnly=True
 showModelSummary=False
 numOfEpochs=300
+maskThreshold=0.5
 np.random.seed(seed)
 
 
@@ -45,6 +46,7 @@ pre_settings["initialLearningRate"]=initialLearningRate
 pre_settings["nonZeroMasksOnly"]=nonZeroMasksOnly
 pre_settings["numOfEpochs"]=numOfEpochs
 pre_settings["showModelSummary"]=showModelSummary
+pre_settings["maskThreshold"]=maskThreshold
 pre_settings["c"]="continue"
 pre_settings["e"]="Exit!"
 

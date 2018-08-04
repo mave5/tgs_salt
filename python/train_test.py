@@ -48,7 +48,7 @@ utils_train_test.updateRecoredInConfigs(configs.path2configs,"avgMetric",np.mean
 # Obtain and store predictions of Ensemble model for train data
 # =============================================================================
 X,Y,ids_train=utils_train_test.load_data(configs,"train")
-Y_pred=utils_train_test.getOutputAllFolds(X,configs)
+Y_pred=utils_train_test.getOutputAllFolds(X,configs,binaryMask=False)
 utils_train_test.storePredictions(configs,Y_pred,"train")
 
 

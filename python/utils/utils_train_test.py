@@ -104,7 +104,7 @@ def getOutputAllFolds_classification(X,configs):
     return Y_pred        
 
 
-def getOutputAllFolds(X,configs):
+def getOutputAllFolds(X,configs,binaryMask=True):
     nFolds=configs.nFolds
     Y_predAllFolds=[]
     for foldnm in range(1,nFolds+1):
@@ -112,14 +112,16 @@ def getOutputAllFolds(X,configs):
     
         Y_pred=getYperFold(X,configs,foldnm)    
         array_stats(Y_pred)
-        disp_imgs_masks(X,Y_pred>=.5)
+        disp_imgs_masks(X,Y_pred>=configs.maskThreshold)
         Y_predAllFolds.append(Y_pred)        
         print('-'*50)
         
     # convert to array
     Y_predAllFolds=np.hstack(Y_predAllFolds)
     print ('ensemble shape:', Y_predAllFolds.shape)
-    Y_leaderboard=np.mean(Y_predAllFolds,axis=1)[:,np.newaxis]>=0.5
+    Y_leaderboard=np.mean(Y_predAllFolds,axis=1)[:,np.newaxis] #>=0.5
+    if binaryMask is True:
+        Y_leaderboard=Y_leaderboard>=configs.maskThreshold    
     array_stats(Y_leaderboard)
         
     return Y_leaderboard        
@@ -295,7 +297,7 @@ def trainNfolds(X,Y,configs):
     scores_nfolds=[]
     evalMatric_nfolds=[]
     dice_nfolds=[]
-    maskThreshold=0.5
+    maskThreshold=configs.maskThreshold
     
     print ('wait ...')
     for train_ind, test_ind in skf.split(X,Y):
@@ -508,6 +510,7 @@ def train_test_classification(data,params_train,model):
     path2weights=params_train['path2weights'] 
     normalizationParams=params_train["normalizationParams"]
     augmentationParams=params_train["augmentationParams"]
+    nbepoch=params_train["nbepoch"]
     
     path2model=os.path.join(weightfolder,"model.hdf5")    
     
@@ -551,11 +554,11 @@ def train_test_classification(data,params_train,model):
     
     # augmentation data generator
     train_generator,steps_per_epoch=data_generator_classification(X_train,Y_train,batch_size,augmentationParams)
-
+    
     
     for epoch in range(params_train['nbepoch']):
     
-        print ('epoch: %s,  Current Learning Rate: %.1e' %(epoch,model.optimizer.lr.get_value()))
+        print ('epoch: %s / %s,  Current Learning Rate: %.1e' %(epoch,nbepoch,model.optimizer.lr.get_value()))
         #seed = np.random.randint(0, 999999)
     
         if augmentation:
@@ -635,7 +638,7 @@ def train_test_model(data,params_train,model):
     path2weights=params_train['path2weights'] 
     normalizationParams=params_train["normalizationParams"]
     augmentationParams=params_train["augmentationParams"]
-    
+    nbepoch=params_train["nbepoch"]
     path2model=os.path.join(weightfolder,"model.hdf5")    
     
     print('batch_size: %s, Augmentation: %s' %(batch_size,augmentation))
@@ -680,7 +683,7 @@ def train_test_model(data,params_train,model):
     
     for epoch in range(params_train['nbepoch']):
     
-        print ('epoch: %s,  Current Learning Rate: %.1e' %(epoch,model.optimizer.lr.get_value()))
+        print ('epoch: %s / %s,  Current Learning Rate: %.1e' %(epoch,nbepoch,model.optimizer.lr.get_value()))
         #seed = np.random.randint(0, 999999)
     
         if augmentation:
