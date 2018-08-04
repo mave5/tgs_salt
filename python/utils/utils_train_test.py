@@ -11,11 +11,11 @@ from sklearn.model_selection import ShuffleSplit
 from sklearn.model_selection import StratifiedShuffleSplit
 import pandas as pd
 import datetime
-
+from glob import glob
 
 
 def storePredictions(configs,Y_pred,suffix=""):
-    path2pickle=os.path.join(configs.path2predictions,"Y_pred_"+suffix+".p")    
+    path2pickle=os.path.join(configs.path2predictions,"Y_pred_"+suffix+"_"+configs.experiment+".p")    
     data = { "Y": Y_pred }
     pickle.dump( data, open( path2pickle, "wb" ) )
     print("predictions stored!")
@@ -37,6 +37,9 @@ def updateRecoredInConfigs(path2Configs,recordName,recordValue,overwrite=False):
             print(recordValue)
     else:
         print('record does not exist in data frame!')
+        row=[len(configsDF),recordName,recordValue]
+        configsDF.loc[len(configsDF)]=row
+        configsDF.to_csv(path2Configs,index=False) # store to csv
     return configsDF            
 
 
@@ -47,7 +50,7 @@ def createSubmission(rlcDict,configs):
 
     # Create submission DataFrame
     now = datetime.datetime.now()
-    info=configs.experiment
+    info=configs.seg_model_version+"_"+configs.experiment
     suffix = info + '_' + str(now.strftime("%Y-%m-%d-%H-%M"))
     submissionFolder=os.path.join(configs.path2experiment,"submissions")
     if not os.path.exists(submissionFolder):
@@ -436,7 +439,7 @@ def preprocess(X,params):
                 meanX=np.mean(X[img_ind,index,:,:])
                 stdX = np.std(X[img_ind,index,:,:])
                 X[img_ind,index] -= meanX
-                if stdX!=0.0:
+                if stdX>0.0:
                     X[img_ind,index] /= stdX
     elif norm_type == 'minus1_plus1': # [-1 to +1]
         X=np.array(X,'float32')
@@ -460,7 +463,9 @@ def preprocess(X,params):
 
 def data_generator(X_train,Y_train,batch_size,augmentationParams):
     image_datagen = ImageDataGenerator(**augmentationParams)
-    mask_datagen = ImageDataGenerator(**augmentationParams)
+    augmentationParams_mask=augmentationParams.copy()
+    augmentationParams_mask["preprocessing_function"]=None
+    mask_datagen = ImageDataGenerator(**augmentationParams_mask)
     
     # Provide the same seed and keyword arguments to the fit and flow methods
     seed = 1
@@ -802,7 +807,10 @@ def load_data_classification(configs,data_type="train"):
         raise IOError(path2pickle+" does not exist!")
 
     # loading predictions
-    path2pickle=os.path.join(configs.path2data,"Y_pred_"+data_type+".p")
+    path2pickle=glob(configs.path2data+"Y_pred_"+data_type+"*.p")[0]
+    seg_model_version=path2pickle.split("_")[3][:-2] # get seg model version
+    configs.seg_model_version=seg_model_version # store model version
+    #path2pickle=os.path.join(configs.path2data,"Y_pred_"+data_type+".p")
     if os.path.exists(path2pickle):
         data = pickle.load( open( path2pickle, "rb" ) )
         Y_pred=data["Y"]

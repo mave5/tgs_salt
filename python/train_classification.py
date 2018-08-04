@@ -16,6 +16,7 @@ utils_train_test.array_stats(y)
 utils_train_test.disp_imgs_masks_labels(X,y)
 
 
+
 # =============================================================================
 # train for n-Folds
 # =============================================================================
@@ -26,6 +27,7 @@ evalMatric_nfolds=utils_train_test.trainNfolds_classification(X,y,configs)
 # =============================================================================
 utils_train_test.updateRecoredInConfigs(configs.path2configs,"nFoldsMetrics",evalMatric_nfolds)
 utils_train_test.updateRecoredInConfigs(configs.path2configs,"avgMetric",np.mean(evalMatric_nfolds))
+utils_train_test.updateRecoredInConfigs(configs.path2configs,"segModelVersion",configs.seg_model_version,overwrite=True)
 
 
 # =============================================================================

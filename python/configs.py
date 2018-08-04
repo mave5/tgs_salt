@@ -23,9 +23,9 @@ nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
-agileIterationNum="0" # iteration number
+agileIterationNum="1" # iteration number
 seed = 2018 # fix random seed for reproducibility
-initialLearningRate=3e-4
+initialLearningRate=1e-4
 nonZeroMasksOnly=True
 showModelSummary=False
 numOfEpochs=300
@@ -204,18 +204,17 @@ def preprocessing_function(x):
         x=np.array(x,'float32')
         for c in range(x.shape[0]):
             meanX=np.mean(x[c])
-            x[c] -= meanX
             stdX = np.std(x[c])
-            if stdX!=0.0:
+            x[c] -= meanX
+            
+            if stdX>0.0:
                 x[c] /= stdX
-    elif normalization_type is None:
-         pass        
-    else:       
-        raise IOError(normalization_type+ " not found!")
-         
+    elif normalization_type==None:
+        pass
+    else:                
+        raise IOError(normalization_type+" not found!")
     return x
 thismodule = sys.modules[__name__]
-
 pp_func=getattr(thismodule, "preprocessing_function")
 
 if configsDF is None:
@@ -234,6 +233,8 @@ else:
     augmentationParams["preprocessing_function"]=pp_func
     print('augmentationParams loaded from Configs!')
     print('-'*50)
+
+
     
 #==============================================================================
 # Elastic Parameters
@@ -301,15 +302,19 @@ else:
     trainingParams['path2experiment']=path2experiment # we over write weightfolder
     trainingParams['pre_train']=pre_train # we over write pre_train value
     trainingParams['normalizationParams']=normalizationParams
+    trainingParams["augmentationParams"]=augmentationParams
     print('params_train loaded from settings!')
     print('-'*50)
     
 #==============================================================================
 # we store settings into a csv file for future reference
 #==============================================================================
-
 if configsDF is None:
-    augmentationParams["preprocessing_function"]="preprocessing_function"
+    # we do want to store objects in csv
+    augmentationParams_csv=augmentationParams.copy()
+    augmentationParams_csv["preprocessing_function"]="preprocessing_function"
+    trainingParams_csv=trainingParams.copy()
+    trainingParams_csv["augmentationParams"]=augmentationParams_csv
     colsDict={
             'model_type':model_type,
             'normalizationParams':normalizationParams,
@@ -321,8 +326,8 @@ if configsDF is None:
             'theano version':utils_config.get_version('theano'),
             'numpy version':utils_config.get_version('numpy'),
             'message':message,
-            'trainingParams':trainingParams,
-            'augmentationParams':augmentationParams,        
+            'trainingParams':trainingParams_csv,
+            'augmentationParams':augmentationParams_csv,        
             'nFoldsMetrics': None,
             'avgMetric': None,
             'test_size': test_size,

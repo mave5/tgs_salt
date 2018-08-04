@@ -17,13 +17,13 @@ import json
 # Initial Configs
 # =============================================================================
 img_height,img_width,img_channel=101,101,2 # image dimensions
-numOfInputConvFilters=16 # number of input conv filters
+numOfInputConvFilters=8 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
-agileIterationNum="0" # iteration number
+agileIterationNum="1" # iteration number
 seed = 2018 # fix random seed for reproducibility
 initialLearningRate=1e-4
 nonZeroMasksOnly=False # only for segmentation
@@ -200,14 +200,22 @@ print('-'*50)
 # Augmentation parameters
 #==============================================================================
 def preprocessing_function(x):
-    x=np.array(x,'float32')
-    for c in range(x.shape[0]):
-        meanX=np.mean(x[c])
-        stdX = np.std(x[c])
-        x[c] -= meanX
-        if stdX!=0.0:
-            x[c] /= stdX
+    if normalization_type=="zeroMeanUnitStdPerSample":
+        x=np.array(x,'float32')
+        for c in range(x.shape[0]):
+            meanX=np.mean(x[c])
+            stdX = np.std(x[c])
+            x[c] -= meanX
+            
+            if stdX>0.0:
+                x[c] /= stdX
+    elif normalization_type==None:
+        pass
+    else:                
+        raise IOError(normalization_type+" not found!")
     return x
+thismodule = sys.modules[__name__]
+pp_func=getattr(thismodule, "preprocessing_function")
 
 if configsDF is None:
     augmentationParams = dict(samplewise_center=False,
@@ -217,11 +225,12 @@ if configsDF is None:
                          height_shift_range=0.1,
                          zoom_range=0.05,
                          shear_range=0.1,
-                         preprocessing_function=preprocessing_function,
+                         preprocessing_function=pp_func,
                          )
 else:
     augmentationParams=configsDF.loc[configsDF['Name']=='augmentationParams','Value'].tolist()[0]
     augmentationParams=ast.literal_eval(augmentationParams)    
+    augmentationParams["preprocessing_function"]=pp_func
     print('augmentationParams loaded from Configs!')
     print('-'*50)
     
@@ -265,7 +274,7 @@ if configsDF is None:
             #'loss': 'categorical_crossentropy',
             'loss': 'binary_crossentropy',
             #"loss": "custom",
-            'nbepoch': 200,
+            'nbepoch': 300,
             'numOfOutputs': 1,
             'initial_channels':numOfInputConvFilters,
             'dropout_rate': 0.5,
@@ -299,6 +308,12 @@ else:
 #==============================================================================
 
 if configsDF is None:
+    # we do want to store objects in csv
+    augmentationParams_csv=augmentationParams.copy()
+    augmentationParams_csv["preprocessing_function"]="preprocessing_function"
+    trainingParams_csv=trainingParams.copy()
+    trainingParams_csv["augmentationParams"]=augmentationParams_csv
+    
     colsDict={
             'model_type':model_type,
             'normalizationParams':normalizationParams,

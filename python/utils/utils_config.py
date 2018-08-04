@@ -7,6 +7,8 @@ import csv
 import numpy as np
 
 
+
+
 def sort_nicely( l ): 
   """ Sort the given list in the way that humans expect. 
   """ 
