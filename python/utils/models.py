@@ -195,7 +195,7 @@ def model_skip2(params):
     conv10=conv2dcustom(filters=C,x_input=conv10,w2reg=w2reg,pool=False,activation='leaky')        
     
     conv10 = Conv2D(numOfOutputs, 1, data_format=data_format,kernel_regularizer=w2reg,activation=None)(conv10)
-    conv10=Cropping2D(cropping=((13,14),(13,14)),data_format=data_format)(conv10)
+    conv10=Cropping2D(cropping=(cropping_padding,cropping_padding),data_format=data_format)(conv10)
 
     if reshape4softmax== True:
         # reshape for softmax

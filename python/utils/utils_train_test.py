@@ -14,6 +14,18 @@ import datetime
 from glob import glob
 
 
+def unpadArray(Y,padSize=(13,14)):
+    before,after=padSize  
+    Y=Y[:,:,before:-after,before:-after]
+    return Y
+
+def padArrays(X,Y,padSize=(13,14)):
+    X=np.pad(X,((0,0),(0,0),padSize,padSize),"constant")
+    if Y is not None:
+        Y=np.pad(Y,((0,0),(0,0),padSize,padSize),"constant")
+    return X,Y    
+
+
 def storePredictions(configs,Y_pred,suffix=""):
     path2pickle=os.path.join(configs.path2predictions,"Y_pred_"+suffix+"_"+configs.experiment+".p")    
     data = { "Y": Y_pred }
@@ -50,7 +62,10 @@ def createSubmission(rlcDict,configs):
 
     # Create submission DataFrame
     now = datetime.datetime.now()
-    info=configs.seg_model_version+"_"+configs.experiment
+    try:
+        info=configs.seg_model_version+"_"+configs.experiment
+    except:
+        info=configs.experiment
     suffix = info + '_' + str(now.strftime("%Y-%m-%d-%H-%M"))
     submissionFolder=os.path.join(configs.path2experiment,"submissions")
     if not os.path.exists(submissionFolder):
@@ -74,6 +89,34 @@ def converMasksToRunLengthDict(Y_leaderboard,ids_leaderboard):
         runLengthDict[id_]=runLengthMaskPred 
     print("RLC completed!")
     return runLengthDict        
+
+
+def getOutputAllFolds_classify_prob(X,configs):
+    nFolds=configs.nFolds
+    y_predAllFolds=[]
+    for foldnm in range(1,nFolds+1):
+        print('fold: %s' %foldnm)
+    
+        y_pred=getYperFold(X,configs,foldnm)    
+        array_stats(y_pred)
+        disp_imgs_masks_labels(X,y_pred>=configs.binaryThreshold)
+        y_predAllFolds.append(y_pred)        
+        print('-'*50)
+        
+    # convert to array
+    y_predAllFolds=np.hstack(y_predAllFolds)
+    print ('ensemble shape:', y_predAllFolds.shape)
+    y_leaderboard=np.mean(y_predAllFolds,axis=1)[:,np.newaxis]>=configs.binaryThreshold
+    array_stats(y_leaderboard)
+
+    # remember that we concatenated mask probability
+    # to the second channel of X_leaderboard.
+    Y_pred=(X[:,1]>=configs.maskThreshold).astype("uint8")[:,np.newaxis]
+    for k in range(len(Y_pred)):
+        if y_leaderboard[k,0]==False:
+            Y_pred[k,0]=np.zeros_like(Y_pred[k,0],"uint8")
+    
+    return Y_pred        
 
 
 def getOutputAllFolds_classification(X,configs):
@@ -767,7 +810,7 @@ def disp_imgs_masks_labels(X,y,r=2,c=3):
     indices=np.random.randint(len(X),size=n)
     for k,ind in enumerate(indices):
         img=X[ind,0]
-        mask=X[ind,1]
+        mask=X[ind,1]>=0.5
         img=overlay_contour(img,mask)    
         h,w=img.shape
         label=y[ind]
@@ -795,6 +838,40 @@ def array_stats(X):
     print ('array shape: ',X.shape, X.dtype)
     #print 'min: %.3f, max:%.3f, avg: %.3f, std:%.3f' %(np.min(X),np.max(X),np.mean(X),np.std(X))
     print ('min: {}, max: {}, avg: {:.3}, std:{:.3}'.format( np.min(X),np.max(X),np.mean(X),np.std(X)))
+
+
+def load_data_classify_prob(configs,data_type="train"):
+    
+    # loading images and masks
+    path2pickle=os.path.join(configs.path2data,data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        X=data["X"]
+        X=X.astype("float32")/255.
+        Y=data["Y"]
+        ids=data["ids"]
+    else:
+        raise IOError(path2pickle+" does not exist!")
+
+    # loading predictions
+    path2pickle=glob(configs.path2data+"Y_pred_"+data_type+"*.p")[0]
+    seg_model_version=path2pickle.split("_")[3][:-2] # get seg model version
+    configs.seg_model_version=seg_model_version # store model version
+    #path2pickle=os.path.join(configs.path2data,"Y_pred_"+data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        Y_pred=data["Y"]
+        #Y_pred=np.array(Y_pred*255,"uint8") # same range as images
+    else:
+        raise IOError(path2pickle+" does not exist!")
+
+    # concat images and predictions
+    X=np.concatenate((X,Y_pred),axis=1)
+    
+    # conver masks to labels
+    y=np.any(Y,axis=(1,2,3))
+    
+    return X,y,ids
     
 
 def load_data_classification(configs,data_type="train"):
@@ -829,6 +906,7 @@ def load_data_classification(configs,data_type="train"):
     
     return X,y,ids
             
+
 
 def load_data(configs,data_type="train"):
     path2pickle=os.path.join(configs.path2data,data_type+".p")

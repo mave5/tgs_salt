@@ -9,7 +9,7 @@ import numpy as np
 #from sklearn.model_selection import ShuffleSplit
 #from utils import models
 
-configs.showModelSummary=False
+configs.showModelSummary=True
 
 #%%
 
@@ -17,6 +17,7 @@ configs.showModelSummary=False
 # load data    
 # =============================================================================
 X,Y,ids_train=utils_train_test.load_data(configs,"train")
+X,Y=utils_train_test.padArrays(X,Y,configs.padSize)
 utils_train_test.array_stats(X)
 utils_train_test.array_stats(Y)
 utils_train_test.disp_imgs_masks(X,Y)
@@ -49,6 +50,7 @@ utils_train_test.updateRecoredInConfigs(configs.path2configs,"avgMetric",np.mean
 # =============================================================================
 X,Y,ids_train=utils_train_test.load_data(configs,"train")
 Y_pred=utils_train_test.getOutputAllFolds(X,configs,binaryMask=False)
+Y_pred=utils_train_test.unpadArray(Y_pred,configs.padSize)
 utils_train_test.storePredictions(configs,Y_pred,"train")
 
 
@@ -56,13 +58,15 @@ utils_train_test.storePredictions(configs,Y_pred,"train")
 # leaderboard data
 # =============================================================================
 X_leaderboard,_,ids_leaderboard=utils_train_test.load_data(configs,"test")
+X_leaderboard,_=utils_train_test.padArrays(X_leaderboard,None,configs.padSize)
 utils_train_test.array_stats(X_leaderboard)
 
 
 # =============================================================================
 # get leaderboard data
 # =============================================================================
-Y_leaderboard=utils_train_test.getOutputAllFolds(X_leaderboard,configs)
+Y_leaderboard=utils_train_test.getOutputAllFolds(X_leaderboard,configs,binaryMask=False)
+Y_leaderboard=utils_train_test.unpadArray(Y_leaderboard,configs.padSize)
 
 # =============================================================================
 # store predictions of Ensemble model for Leaderboard data
@@ -72,7 +76,7 @@ utils_train_test.storePredictions(configs,Y_leaderboard,"test")
 # =============================================================================
 # convert outputs to Run Length Dict
 # =============================================================================
-rlcDict=utils_train_test.converMasksToRunLengthDict(Y_leaderboard,ids_leaderboard)    
+rlcDict=utils_train_test.converMasksToRunLengthDict(Y_leaderboard>=configs.maskThreshold,ids_leaderboard)    
   
 
 # =============================================================================

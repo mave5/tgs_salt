@@ -10,12 +10,10 @@ configs.showModelSummary=True
 # =============================================================================
 # load data    
 # =============================================================================
-X,y,ids_train=utils_train_test.load_data_classification(configs,"train")
+X,y,ids_train=utils_train_test.load_data_classify_prob(configs,"train")
 utils_train_test.array_stats(X)
 utils_train_test.array_stats(y)
 utils_train_test.disp_imgs_masks_labels(X,y)
-
-
 
 # =============================================================================
 # train for n-Folds
@@ -33,14 +31,14 @@ utils_train_test.updateRecoredInConfigs(configs.path2configs,"segModelVersion",c
 # =============================================================================
 # leaderboard data
 # =============================================================================
-X_leaderboard,_,ids_leaderboard=utils_train_test.load_data_classification(configs,"test")
+X_leaderboard,_,ids_leaderboard=utils_train_test.load_data_classify_prob(configs,"test")
 utils_train_test.array_stats(X_leaderboard)
 
 
 # =============================================================================
 # get leaderboard data
 # =============================================================================
-Y_leaderboard=utils_train_test.getOutputAllFolds_classification(X_leaderboard,configs)
+Y_leaderboard=utils_train_test.getOutputAllFolds_classify_prob(X_leaderboard,configs)
 
 # =============================================================================
 # store predictions of Ensemble model for Leaderboard data

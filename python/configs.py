@@ -30,6 +30,7 @@ nonZeroMasksOnly=True
 showModelSummary=False
 numOfEpochs=300
 maskThreshold=0.5
+padSize=(13,14) # to make image size 128*128
 np.random.seed(seed)
 
 
@@ -47,6 +48,7 @@ pre_settings["nonZeroMasksOnly"]=nonZeroMasksOnly
 pre_settings["numOfEpochs"]=numOfEpochs
 pre_settings["showModelSummary"]=showModelSummary
 pre_settings["maskThreshold"]=maskThreshold
+pre_settings["padSize"]=padSize
 pre_settings["c"]="continue"
 pre_settings["e"]="Exit!"
 
@@ -269,8 +271,8 @@ print('-'*50)
 # =============================================================================
 if configsDF is None:
     trainingParams={
-            'h': img_height,
-            'w': img_width,
+            'h': img_height+sum(padSize),
+            'w': img_width+sum(padSize),
             'z':img_channel,
             'learning_rate': initialLearningRate,
             #'optimizer': 'Adam',
@@ -296,7 +298,8 @@ if configsDF is None:
             'reshape4softmax': False,
             "data_format": 'channels_first',
             "augmentation": True,
-            "cropping_padding": (13,14),
+            #"cropping_padding": (13,14),
+            "cropping_padding": (0,0),
             }
 else:
     trainingParams=configsDF.loc[configsDF['Name']=='trainingParams','Value'].tolist()[0]
@@ -356,4 +359,9 @@ else:
     else:
         raise IOError('nonZeroMasksOnly not found!')
     
-
+    # load pad size
+    try:
+        padSize=configsDF.loc[configsDF['Name']=='padSize','Value'].tolist()[0]        
+        padSize=ast.literal_eval(padSize)    
+    except:
+        pass

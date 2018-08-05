@@ -28,6 +28,7 @@ seed = 2018 # fix random seed for reproducibility
 initialLearningRate=1e-4
 nonZeroMasksOnly=False # only for segmentation
 binaryThreshold=0.5
+maskThreshold=0.5
 showModelSummary=False
 np.random.seed(seed)
 
@@ -44,6 +45,8 @@ pre_settings["numOfInputConvFilters"]=numOfInputConvFilters
 pre_settings["initialLearningRate"]=initialLearningRate
 pre_settings["nonZeroMasksOnly"]=nonZeroMasksOnly
 pre_settings["showModelSummary"]=showModelSummary
+pre_settings["binaryThreshold"]=binaryThreshold
+pre_settings["maskThreshold"]=maskThreshold
 pre_settings["c"]="continue"
 pre_settings["e"]="Exit!"
 
