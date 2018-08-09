@@ -17,7 +17,7 @@ import json
 # Initial Configs
 # =============================================================================
 img_height,img_width,img_channel=101,101,1 # image dimensions
-numOfInputConvFilters=16 # number of input conv filters
+numOfInputConvFilters=32 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
@@ -25,12 +25,13 @@ stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
 agileIterationNum="1" # iteration number
 seed = 2018 # fix random seed for reproducibility
-initialLearningRate=1e-4
+initialLearningRate=2e-4
 nonZeroMasksOnly=True
 showModelSummary=False
-numOfEpochs=300
+numOfEpochs=500
 maskThreshold=0.5
-padSize=(13,14) # to make image size 128*128
+#padSize=(13,14) # to make image size 128*128
+padSize=(0,0) # no zero padding
 np.random.seed(seed)
 
 
@@ -203,7 +204,9 @@ print('-'*50)
 #==============================================================================
 # Augmentation parameters
 #==============================================================================
+            
 def preprocessing_function(x):
+   
     if normalization_type=="zeroMeanUnitStdPerSample":
         x=np.array(x,'float32')
         for c in range(x.shape[0]):
@@ -298,8 +301,8 @@ if configsDF is None:
             'reshape4softmax': False,
             "data_format": 'channels_first',
             "augmentation": True,
-            #"cropping_padding": (13,14),
-            "cropping_padding": (0,0),
+            "cropping_padding": (13,14),
+            #"cropping_padding": (0,0),
             }
 else:
     trainingParams=configsDF.loc[configsDF['Name']=='trainingParams','Value'].tolist()[0]

@@ -49,6 +49,7 @@ utils_train_test.updateRecoredInConfigs(configs.path2configs,"avgMetric",np.mean
 # Obtain and store predictions of Ensemble model for train data
 # =============================================================================
 X,Y,ids_train=utils_train_test.load_data(configs,"train")
+X,Y=utils_train_test.padArrays(X,Y,configs.padSize)
 Y_pred=utils_train_test.getOutputAllFolds(X,configs,binaryMask=False)
 Y_pred=utils_train_test.unpadArray(Y_pred,configs.padSize)
 utils_train_test.storePredictions(configs,Y_pred,"train")
@@ -63,7 +64,7 @@ utils_train_test.array_stats(X_leaderboard)
 
 
 # =============================================================================
-# get leaderboard data
+# get output for leaderboard data
 # =============================================================================
 Y_leaderboard=utils_train_test.getOutputAllFolds(X_leaderboard,configs,binaryMask=False)
 Y_leaderboard=utils_train_test.unpadArray(Y_leaderboard,configs.padSize)

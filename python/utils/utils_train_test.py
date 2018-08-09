@@ -12,14 +12,30 @@ from sklearn.model_selection import StratifiedShuffleSplit
 import pandas as pd
 import datetime
 from glob import glob
+# elastic augmentation
+#from scipy.ndimage.filters import gaussian_filter
+
+
+def gammaAugment(image,gamma=0.1):
+    if np.random.random()<0.5:
+        g_rand=(2 * np.random.rand() - 1) # random number between -1 to +1
+        g = g_rand * gamma + 1.
+    else:
+        g= 1
+    image=(255 * (image / 255.) ** g).astype("float32")
+    return image    
 
 
 def unpadArray(Y,padSize=(13,14)):
     before,after=padSize  
+    if (before==0 and after==0):
+        return Y
     Y=Y[:,:,before:-after,before:-after]
     return Y
 
 def padArrays(X,Y,padSize=(13,14)):
+    if padSize==(0,0):
+        return X,Y
     X=np.pad(X,((0,0),(0,0),padSize,padSize),"constant")
     if Y is not None:
         Y=np.pad(Y,((0,0),(0,0),padSize,padSize),"constant")
@@ -743,6 +759,12 @@ def train_test_model(data,params_train,model):
         print ('score_train: %s, score_test: %s' %(score_train,score_test))
         scores_test=np.append(scores_test,score_test)
         scores_train=np.append(scores_train,score_train)    
+
+        # evaluation metric        
+        Y_pred=model.predict(preprocess(X_test,normalizationParams))>=0.5
+        evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
+        print('eval metric: %.2f' %evalMetricPerFold)
+        
 
         # check for improvement    
         if (score_test<=best_score):

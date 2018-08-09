@@ -14,6 +14,32 @@ from keras.regularizers import l2
 from keras.layers import ZeroPadding2D
 from keras.layers import Cropping2D
 from keras.layers import AveragePooling2D
+from keras import backend as K
+
+
+def intersectionOverUnion(y_true, y_pred):
+    smooth=1
+    y_true_f = K.batch_flatten(y_true)
+    y_pred_f = K.batch_flatten(y_pred)
+    intersection = K.sum(y_true_f * y_pred_f, axis=1, keepdims=True) + smooth
+    union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) + smooth-intersection
+    return K.mean(intersection / union)
+
+def iou_loss(y_true, y_pred):
+    return -intersectionOverUnion(y_true, y_pred)
+
+def dice_coef(y_true, y_pred):
+    smooth=1
+    y_true_f = K.batch_flatten(y_true)
+    y_pred_f = K.batch_flatten(y_pred)
+    intersection = 2. * K.sum(y_true_f * y_pred_f, axis=1, keepdims=True) + smooth
+    union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) + smooth
+    return K.mean(intersection / union)
+
+
+def dice_coef_loss(y_true, y_pred):
+    return -dice_coef(y_true, y_pred)
+
 
 def conv2dcustom(x_input,filters=8,kernel_size=3,strides=1,w2reg=None,pool=False,padding='same',batchNorm=False,activation='relu',data_format='channels_first'):
     x1 = Conv2D(filters=filters, kernel_size=kernel_size, padding=padding,data_format=data_format,kernel_regularizer=w2reg,strides=strides)(x_input)
@@ -221,10 +247,99 @@ def model_skip2(params):
     else:
         model.compile(loss=loss, optimizer=optimizer)
         
+    return model
 
-        
+
+def model_encoder_decoder(params):
+    h=params['h']
+    w=params['w']
+    z=params['z']
+    lr=params['learning_rate']
+    loss=params['loss']
+    C=params['initial_channels']
+    numOfOutputs=params['numOfOutputs']
+    dropout_rate=params['dropout_rate']
+    data_format=params["data_format"]
+    batchNorm=params['batchNorm']
+    cropping_padding=params['cropping_padding']
+    w2reg=params['w2reg']
+    if w2reg==True:
+        w2reg=l2(1e-4)
+    else:
+        w2reg=None
+    
+    initStride=params['initStride']
+    reshape4softmax=params['reshape4softmax']
+    optimizer=params["optimizer"]
+    
+    
+    inputs = Input((z,h, w))
+    inputsPadded=ZeroPadding2D(padding=(cropping_padding, cropping_padding),data_format=data_format)(inputs)
+    
+    conv1=conv2dcustom(filters=C,x_input=inputsPadded,strides=initStride,w2reg=w2reg,activation='leaky')    
+    pool1=conv2dcustom(filters=C,x_input=conv1,w2reg=w2reg,pool=True,activation='leaky')    
+
+    conv2=conv2dcustom(filters=2*C,x_input=pool1,w2reg=w2reg,activation='leaky')    
+    pool2=conv2dcustom(filters=2*C,x_input=conv2,w2reg=w2reg,pool=True,activation='leaky')    
+    
+    conv3=conv2dcustom(filters=4*C,x_input=pool2,w2reg=w2reg,activation='leaky')    
+    pool3=conv2dcustom(filters=4*C,x_input=conv3,w2reg=w2reg,pool=True,activation='leaky')    
+
+    conv4=conv2dcustom(filters=8*C,x_input=pool3,w2reg=w2reg,activation='leaky')    
+    pool4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,pool=True,activation='leaky')    
+
+    conv5=conv2dcustom(filters=16*C,x_input=pool4,w2reg=w2reg,activation='leaky')    
+    conv5=conv2dcustom(filters=16*C,x_input=conv5,w2reg=w2reg,pool=False,activation='leaky')    
+    
+    # dropout
+    conv5 =Dropout(dropout_rate)(conv5)
+    
+    up1=UpSampling2D(size=(2, 2),data_format=data_format)(conv5)
+    upconv1=conv2dcustom(filters=8*C,x_input=up1,w2reg=w2reg,pool=False,activation='leaky')    
+    
+    up2 = UpSampling2D(size=(2, 2),data_format=data_format)(upconv1)
+
+    upconv2=conv2dcustom(filters=4*C,x_input=up2,w2reg=w2reg,pool=False,activation='leaky')        
+    
+    up3 = UpSampling2D(size=(2, 2),data_format=data_format)(upconv2)
+    
+    upconv3=conv2dcustom(filters=2*C,x_input=up3,w2reg=w2reg,pool=False,activation='leaky')        
+
+    up4 = UpSampling2D(size=(2, 2),data_format=data_format)(upconv3)
+    upconv4=conv2dcustom(filters=C,x_input=up4,w2reg=w2reg,pool=False,activation='leaky')        
+
+    upconv5 = UpSampling2D(size=(initStride, initStride),data_format=data_format)(upconv4)
+    upconv5=conv2dcustom(filters=C,x_input=upconv5,w2reg=w2reg,pool=False,activation='leaky')        
+    
+    upconv6 = Conv2D(numOfOutputs, 1, data_format=data_format,kernel_regularizer=w2reg,activation=None)(upconv5)
+    upconv6=Cropping2D(cropping=(cropping_padding,cropping_padding),data_format=data_format)(upconv6)
+
+    if reshape4softmax== True:
+        # reshape for softmax
+        output=Reshape((numOfOutputs,h*w)) (upconv6)
+        # permute for softmax
+        output=Permute((2,1))(output)
+        # softmax
+        output=Activation('softmax')(output)
+    else:        
+        output=Activation('sigmoid')(upconv6)
+    
+    model = Model(inputs=inputs, outputs=output)
+
+    if optimizer=='RMSprop':
+        optimizer = RMSprop(lr)
+    elif optimizer=='Adam':       
+        optimizer = Adam(lr)
+    elif optimizer=='Nadam':       
+        optimizer = Nadam(lr,clipvalue=1.0)        
+
+    if loss=='dice':
+        model.compile(optimizer=optimizer, loss=dice_coef_loss, metrics=[dice_coef])
+    else:
+        model.compile(loss=loss, optimizer=optimizer)
     
     return model
+
 
 
 

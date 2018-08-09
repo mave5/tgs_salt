@@ -17,7 +17,7 @@ import json
 # Initial Configs
 # =============================================================================
 img_height,img_width,img_channel=101,101,2 # image dimensions
-numOfInputConvFilters=8 # number of input conv filters
+numOfInputConvFilters=16 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
@@ -30,6 +30,7 @@ nonZeroMasksOnly=False # only for segmentation
 binaryThreshold=0.5
 maskThreshold=0.5
 showModelSummary=False
+nbepoch=300
 np.random.seed(seed)
 
 
@@ -277,7 +278,7 @@ if configsDF is None:
             #'loss': 'categorical_crossentropy',
             'loss': 'binary_crossentropy',
             #"loss": "custom",
-            'nbepoch': 300,
+            'nbepoch': nbepoch,
             'numOfOutputs': 1,
             'initial_channels':numOfInputConvFilters,
             'dropout_rate': 0.5,
