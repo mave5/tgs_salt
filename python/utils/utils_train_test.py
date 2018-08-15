@@ -393,7 +393,9 @@ def trainNfolds(X,Y,configs):
         model=createModel(configs,configs.showModelSummary)
         
         data=X_train,Y_train,X_test,Y_test
-        train_test_model(data,trainingParams,model)
+        #train_test_model(data,trainingParams,model)
+        train_test_evalMetric(data,trainingParams,model)
+        
         
         # loading best weights from training session
         if  os.path.exists(path2weights):
@@ -448,14 +450,10 @@ def compute_precision_at(iou, threshold):
 
 
 def computeIoUperSample(x,y):
-
     intersectXY=np.sum((x&y==1))
     unionXY=np.sum(x)+np.sum(y)-intersectXY
-
-    if unionXY!=0.:
-        iou= intersectXY/(unionXY*1.0)
-    else:
-        iou=1.0
+    smooth=1e-5
+    iou= float(intersectXY+smooth)/(unionXY+smooth)
     return iou
 
 
@@ -818,6 +816,137 @@ def train_test_model(data,params_train,model):
     return train_status    
 
 
+def train_test_evalMetric(data,params_train,model):
+    X_train,Y_train,X_test,Y_test=data
+    foldnm=params_train['foldnm']  
+    pre_train=params_train['pre_train'] 
+    batch_size=params_train['batch_size'] 
+    augmentation=params_train['augmentation'] 
+    weightfolder=params_train['weightfolder'] 
+    path2weights=params_train['path2weights'] 
+    normalizationParams=params_train["normalizationParams"]
+    augmentationParams=params_train["augmentationParams"]
+    nbepoch=params_train["nbepoch"]
+    path2model=os.path.join(weightfolder,"model.hdf5")    
+    
+    print('batch_size: %s, Augmentation: %s' %(batch_size,augmentation))
+    print ('fold %s training in progress ...' %foldnm)
+    
+    # load last weights
+    if pre_train== True:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print ('previous weights loaded!')
+        else:
+            raise IOError('weights does not exist!!!')
+    else:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print (path2weights)
+            print ('previous weights loaded!')
+            train_status='previous weights'
+            return train_status
+    
+    # path to csv file to save scores
+    path2scorescsv = os.path.join(weightfolder,'scores.csv')
+    first_row = 'train,test'
+    with open(path2scorescsv, 'w+') as f:
+        f.write(first_row + '\n')
+           
+    # initialize     
+    start_time=time.time()
+    scores_test=[]
+    scores_train=[]
+    if params_train['evalMetric']=='evalMetric': 
+        best_score = 0
+        previous_score = 0
+    else:
+        best_score = 1e6
+        previous_score = 1e6
+    patience = 0
+    
+    # augmentation data generator
+    train_generator,steps_per_epoch=data_generator(X_train,Y_train,batch_size,augmentationParams)
+
+    
+    for epoch in range(params_train['nbepoch']):
+    
+        print ('epoch: %s / %s,  Current Learning Rate: %.1e' %(epoch,nbepoch,model.optimizer.lr.get_value()))
+        #seed = np.random.randint(0, 999999)
+    
+        if augmentation:
+            hist=model.fit_generator(train_generator,steps_per_epoch=steps_per_epoch,epochs=1, verbose=0)
+            #X_batch,Y_batch=iterate_minibatches(X_train,y_train,X_train.shape[0],shuffle=False,augment=True)  
+            #hist=model.fit(preprocess(X_batch,normalizationParams), Y_batch, batch_size=batch_size,epochs=1, verbose=0)
+        else:
+            hist=model.fit(preprocess(X_train,normalizationParams), Y_train, batch_size=batch_size,epochs=1, verbose=0)
+            
+        # evaluate on test and train data
+        score_test=model.evaluate(preprocess(X_test,normalizationParams),Y_test,verbose=0)
+        score_train=np.mean(hist.history['loss'])
+       
+        print ('score_train: %s, score_test: %s' %(score_train,score_test))
+        scores_test=np.append(scores_test,score_test)
+        scores_train=np.append(scores_train,score_train)    
+
+        # evaluation metric        
+        Y_pred=model.predict(preprocess(X_test,normalizationParams))>=0.5
+        evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
+        print('eval metric: %.2f' %evalMetricPerFold)
+        score_test=evalMetricPerFold
+
+        # check for improvement    
+        if (score_test>=best_score):
+            print ("!!!!!!!!!!!!!!!!!!!!!!!!!!! viva, improvement!!!!!!!!!!!!!!!!!!!!!!!!!!!") 
+            best_score = score_test
+            patience = 0
+            model.save_weights(path2weights)  
+            model.save(path2model)
+            
+        # learning rate schedule
+        if score_test<previous_score:
+            #print "Incrementing Patience."
+            patience += 1
+
+        # learning rate schedule                
+        if patience == params_train['max_patience']:
+            params_train['learning_rate'] = params_train['learning_rate']/2
+            print ("Upating Current Learning Rate to: ", params_train['learning_rate'])
+            model.optimizer.lr.set_value(params_train['learning_rate'])
+            print ("Loading the best weights again. best_score: ",best_score)
+            model.load_weights(path2weights)
+            patience = 0
+        
+        # save current test score
+        previous_score = score_test    
+        
+        # store scores into csv file
+        with open(path2scorescsv, 'a') as f:
+            string = str([score_train,score_test])
+            f.write(string + '\n')
+           
+    
+    print ('model was trained!')
+    elapsed_time=(time.time()-start_time)/60
+    print ('elapsed time: %d  mins' %elapsed_time)      
+
+    # train test progress plots
+    plt.figure(figsize=(10,10))
+    plt.plot(scores_test)
+    plt.plot(scores_train)
+    plt.title('train-validation progress',fontsize=20)
+    plt.legend(('test','train'),fontsize=20)
+    plt.xlabel('epochs',fontsize=20)
+    plt.ylabel('loss',fontsize=20)
+    plt.grid(True)
+    plt.savefig(weightfolder+'/train_val_progress.png')
+    plt.show()
+    
+    print ('training completed!')
+    train_status='completed!'
+    return train_status    
+
+
 def overlay_contour(img,mask):
     mask=np.array(mask,"uint8")
     im2, contours, hierarchy = cv2.findContours(mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
@@ -928,9 +1057,54 @@ def load_data_classification(configs,data_type="train"):
     
     return X,y,ids
             
+def load_pickle(path2pickle):
+    data = pickle.load( open( path2pickle, "rb" ) )
+    X=data["X"]
+    Y=data["Y"]
+    ids=data["ids"]
+    depths=data["depths"]
+    return X,Y.astype("uint8"),ids,depths
 
+def load_data_depth(configs,data_type="train"):
+    path2pickle=os.path.join(configs.path2data,data_type+".p")
+    if os.path.exists(path2pickle):
+        return load_pickle(path2pickle)
+    
+    if data_type=="train":
+        path2dataTT=configs.path2train
+    elif data_type=="test":
+        path2dataTT=configs.path2test
+    else:
+        raise IOError("data type unknown!")
+    
+    ids = next(os.walk(path2dataTT+"images"))[2]
+    # Get and resize train images and masks
+    X = np.zeros((len(ids), configs.img_channel,configs.img_height, configs.img_width ), dtype=np.uint8)
+    Y = np.zeros((len(ids), configs.img_channel,configs.img_height, configs.img_width ), dtype=np.bool)
+    print('loading images ...')
+
+    for n, id_ in enumerate(ids):
+        # loading image
+        img = image.load_img(path2dataTT + '/images/' + id_)
+        X[n] = image.img_to_array(img)[0]
+        
+        # loading mask
+        if data_type=="train":
+            mask=image.load_img(path2dataTT + '/masks/' + id_)
+            Y[n] = image.img_to_array(mask)[0]
+
+    # load depth
+    path2depth=os.path.join(configs.path2data,"depths.csv")
+    depths = pd.read_csv(path2depth)
+
+    data = { "X": X, "Y": Y, "ids": ids, "depths": depths }
+    pickle.dump( data, open( path2pickle, "wb" ) )
+    
+    # load
+    return load_pickle(path2pickle)
 
 def load_data(configs,data_type="train"):
+
     path2pickle=os.path.join(configs.path2data,data_type+".p")
     if os.path.exists(path2pickle):
         data = pickle.load( open( path2pickle, "rb" ) )
@@ -972,3 +1146,7 @@ def load_data(configs,data_type="train"):
     ids=data["ids"]
     
     return X,Y.astype("uint8"),ids
+
+
+
+

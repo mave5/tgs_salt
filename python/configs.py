@@ -23,7 +23,7 @@ nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
-agileIterationNum="1" # iteration number
+agileIterationNum="2" # iteration number
 seed = 2018 # fix random seed for reproducibility
 initialLearningRate=2e-4
 nonZeroMasksOnly=True
@@ -281,7 +281,8 @@ if configsDF is None:
             #'optimizer': 'Adam',
             'optimizer': 'Nadam',
             #'loss': 'categorical_crossentropy',
-            'loss': 'binary_crossentropy',
+            #'loss': 'binary_crossentropy',
+            "loss": "custom",
             #"loss": "custom",
             'nbepoch': numOfEpochs,
             'numOfOutputs': 1,
@@ -302,6 +303,7 @@ if configsDF is None:
             "data_format": 'channels_first',
             "augmentation": True,
             "cropping_padding": (13,14),
+            "evalMetric": "evalMetric",
             #"cropping_padding": (0,0),
             }
 else:

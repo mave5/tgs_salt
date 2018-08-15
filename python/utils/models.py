@@ -15,6 +15,27 @@ from keras.layers import ZeroPadding2D
 from keras.layers import Cropping2D
 from keras.layers import AveragePooling2D
 from keras import backend as K
+from keras import losses
+_EPSILON = K.epsilon()
+
+def loss_combined(y_true,y_pred):
+    loss=losses.binary_crossentropy(y_true,y_pred)-K.log(jacard_coef(y_true,y_pred))
+    return loss
+
+def jacard_coef(y_true, y_pred):
+    y_pred = K.clip(y_pred, _EPSILON, 1.0-_EPSILON)
+
+    smooth=1e-5
+    y_true_f = K.batch_flatten(y_true)
+    y_pred_f = K.batch_flatten(y_pred)
+    #print K.dtype(y_true_f),K.dtype(y_pred_f)
+
+    intersection = K.sum(y_true_f * y_pred_f, axis=1, keepdims=True) 
+
+    union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) -intersection+ smooth
+
+    jaccard=K.mean((intersection+smooth) / union)
+    return jaccard
 
 
 def intersectionOverUnion(y_true, y_pred):
@@ -244,6 +265,8 @@ def model_skip2(params):
 
     if loss=='dice':
         model.compile(optimizer=optimizer, loss=dice_coef_loss, metrics=[dice_coef])
+    elif loss=="custom":
+        model.compile(loss=loss_combined, optimizer=optimizer)
     else:
         model.compile(loss=loss, optimizer=optimizer)
         
