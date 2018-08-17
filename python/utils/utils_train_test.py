@@ -443,16 +443,17 @@ def computeEvalMetricPerSample(gt, prediction):
     
 
 def compute_precision_at(iou, threshold):
+    smooth=1e-9
     tp = iou >= threshold
     fp= iou < threshold
     fn= iou < threshold
-    return float(tp) / (tp + fp + fn)
+    return float(tp+smooth) / (tp + fp + fn+smooth)
 
 
 def computeIoUperSample(x,y):
     intersectXY=np.sum((x&y==1))
     unionXY=np.sum(x)+np.sum(y)-intersectXY
-    smooth=1e-5
+    smooth=1e-9
     iou= float(intersectXY+smooth)/(unionXY+smooth)
     return iou
 
@@ -991,6 +992,40 @@ def array_stats(X):
     print ('min: {}, max: {}, avg: {:.3}, std:{:.3}'.format( np.min(X),np.max(X),np.mean(X),np.std(X)))
 
 
+def load_data_classify_prob_bin(configs,data_type="train"):
+    
+    # loading images and masks
+    path2pickle=os.path.join(configs.path2data,data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        X=data["X"]
+        X=X.astype("float32")/255.
+        Y=data["Y"]
+        ids=data["ids"]
+    else:
+        raise IOError(path2pickle+" does not exist!")
+
+    # loading predictions
+    path2pickle=glob(configs.path2data+"Y_pred_"+data_type+"*.p")[0]
+    seg_model_version=path2pickle.split("_")[3][:-2] # get seg model version
+    configs.seg_model_version=seg_model_version # store model version
+    #path2pickle=os.path.join(configs.path2data,"Y_pred_"+data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        Y_pred=data["Y"]
+        Y_bin_pred=(Y_pred>=configs.binaryThreshold).astype("float32")
+    else:
+        raise IOError(path2pickle+" does not exist!")
+
+    # concat images and predictions
+    X=np.concatenate((X,Y_pred,Y_bin_pred),axis=1)
+    
+    # conver masks to labels
+    y=np.any(Y,axis=(1,2,3))
+    
+    return X,y,ids
+
+
 def load_data_classify_prob(configs,data_type="train"):
     
     # loading images and masks
@@ -1147,6 +1182,23 @@ def load_data(configs,data_type="train"):
     
     return X,Y.astype("uint8"),ids
 
+def data_resize(X,Y,h,w):
+
+    n,c,h0,w0=X.shape
+    if (h0==h and w0==w):
+        return X,Y
+        
+    X_r=np.zeros((n,c,h,w),dtype=X.dtype)
+    if Y is not None:
+        Y_r=np.zeros((n,c,h,w),dtype=Y.dtype)
+    else:
+        Y_r=None
+    for i in range(n):
+        X_r[i,0]=cv2.resize(X[i,0],(w,h),interpolation = cv2.INTER_CUBIC)
+        if Y is not None:
+            Y_r[i,0]=cv2.resize(Y[i,0],(w,h),interpolation = cv2.INTER_CUBIC)
+    return X_r,Y_r
+    
 
 
 

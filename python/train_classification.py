@@ -11,6 +11,7 @@ configs.showModelSummary=True
 # load data    
 # =============================================================================
 X,y,ids_train=utils_train_test.load_data_classify_prob(configs,"train")
+#X,y,ids_train=utils_train_test.load_data_classify_prob_bin(configs,"train")
 utils_train_test.array_stats(X)
 utils_train_test.array_stats(y)
 utils_train_test.disp_imgs_masks_labels(X,y)
@@ -32,6 +33,7 @@ utils_train_test.updateRecoredInConfigs(configs.path2configs,"segModelVersion",c
 # leaderboard data
 # =============================================================================
 X_leaderboard,_,ids_leaderboard=utils_train_test.load_data_classify_prob(configs,"test")
+#X_leaderboard,_,ids_leaderboard=utils_train_test.load_data_classify_prob_bin(configs,"test")
 utils_train_test.array_stats(X_leaderboard)
 
 

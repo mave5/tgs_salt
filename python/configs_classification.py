@@ -16,7 +16,7 @@ import json
 # =============================================================================
 # Initial Configs
 # =============================================================================
-img_height,img_width,img_channel=101,101,2 # image dimensions
+img_height,img_width,img_channel=101,101,3 # image dimensions
 numOfInputConvFilters=16 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
