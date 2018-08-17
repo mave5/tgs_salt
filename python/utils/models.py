@@ -308,6 +308,114 @@ def model_skip2(params):
     return model
 
 
+def model_skip3(params):
+
+    h=params['h']
+    w=params['w']
+    z=params['z']
+    lr=params['learning_rate']
+    loss=params['loss']
+    C=params['initial_channels']
+    numOfOutputs=params['numOfOutputs']
+    dropout_rate=params['dropout_rate']
+    data_format=params["data_format"]
+    batchNorm=params['batchNorm']
+    cropping_padding=params['cropping_padding']
+    w2reg=params['w2reg']
+    if w2reg==True:
+        w2reg=l2(1e-4)
+    else:
+        w2reg=None
+    
+    initStride=params['initStride']
+    reshape4softmax=params['reshape4softmax']
+    optimizer=params["optimizer"]
+    
+    
+    inputs = Input((z,h, w))
+    inputsPadded=ZeroPadding2D(padding=(cropping_padding, cropping_padding),data_format=data_format)(inputs)
+    
+    conv1=conv2dcustom(filters=C,x_input=inputsPadded,strides=initStride,w2reg=w2reg,activation='leaky')    
+    pool1=conv2dcustom(filters=C,x_input=conv1,w2reg=w2reg,pool=True,activation='leaky')    
+
+    conv2=conv2dcustom(filters=2*C,x_input=pool1,w2reg=w2reg,activation='leaky')    
+    conv2=conv2dcustom(filters=2*C,x_input=conv2,w2reg=w2reg,activation='leaky')    
+    pool2=conv2dcustom(filters=2*C,x_input=conv2,w2reg=w2reg,pool=True,activation='leaky')    
+    
+    conv3=conv2dcustom(filters=4*C,x_input=pool2,w2reg=w2reg,activation='leaky')    
+    conv3=conv2dcustom(filters=4*C,x_input=conv3,w2reg=w2reg,activation='leaky')    
+    pool3=conv2dcustom(filters=4*C,x_input=conv3,w2reg=w2reg,pool=True,activation='leaky')    
+
+    conv4=conv2dcustom(filters=8*C,x_input=pool3,w2reg=w2reg,activation='leaky')    
+    conv4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,activation='leaky')    
+    pool4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,pool=True,activation='leaky')    
+
+    conv5=conv2dcustom(filters=16*C,x_input=pool4,w2reg=w2reg,activation='leaky')    
+    conv5=conv2dcustom(filters=16*C,x_input=conv5,w2reg=w2reg,pool=False,activation='leaky')    
+    
+    # dropout
+    conv5 =Dropout(dropout_rate)(conv5)
+    
+    up7=UpSampling2D(size=(2, 2),data_format=data_format)(conv5)
+    concat = Concatenate(axis=1)
+    up7 = concat([up7, conv4])
+
+    conv7=conv2dcustom(filters=8*C,x_input=up7,w2reg=w2reg,pool=False,activation='leaky')    
+    conv7=conv2dcustom(filters=8*C,x_input=conv7,w2reg=w2reg,pool=False,activation='leaky')    
+    
+    up8 = concat([UpSampling2D(size=(2, 2),data_format=data_format)(conv7), conv3])
+
+    conv8=conv2dcustom(filters=4*C,x_input=up8,w2reg=w2reg,pool=False,activation='leaky')        
+    conv8=conv2dcustom(filters=4*C,x_input=conv8,w2reg=w2reg,pool=False,activation='leaky')        
+    
+    up9 = concat([UpSampling2D(size=(2, 2),data_format=data_format)(conv8), conv2])
+    
+    conv9=conv2dcustom(filters=2*C,x_input=up9,w2reg=w2reg,pool=False,activation='leaky')        
+    conv9=conv2dcustom(filters=2*C,x_input=conv9,w2reg=w2reg,pool=False,activation='leaky')        
+
+    up10 = concat([UpSampling2D(size=(2, 2),data_format=data_format)(conv9), conv1])
+    
+    conv10=conv2dcustom(filters=C,x_input=up10,w2reg=w2reg,pool=False,activation='leaky')        
+    conv10=conv2dcustom(filters=C,x_input=conv10,w2reg=w2reg,pool=False,activation='leaky')        
+
+    conv10 = UpSampling2D(size=(initStride, initStride),data_format=data_format)(conv10)
+    
+    conv10=conv2dcustom(filters=C,x_input=conv10,w2reg=w2reg,pool=False,activation='leaky')        
+    
+    conv10 = Conv2D(numOfOutputs, 1, data_format=data_format,kernel_regularizer=w2reg,activation=None)(conv10)
+    conv10=Cropping2D(cropping=(cropping_padding,cropping_padding),data_format=data_format)(conv10)
+
+    if reshape4softmax== True:
+        # reshape for softmax
+        output=Reshape((numOfOutputs,h*w)) (conv10)
+        # permute for softmax
+        output=Permute((2,1))(output)
+        # softmax
+        output=Activation('softmax')(output)
+    else:        
+        output=Activation('sigmoid')(conv10)
+    
+    model = Model(inputs=inputs, outputs=output)
+
+    if optimizer=='RMSprop':
+        optimizer = RMSprop(lr)
+    elif optimizer=='Adam':       
+        optimizer = Adam(lr)
+    elif optimizer=='Nadam':       
+        optimizer = Nadam(lr,clipvalue=1.0)        
+
+    if loss=='dice':
+        model.compile(optimizer=optimizer, loss=dice_coef_loss, metrics=[dice_coef])
+    elif loss=="custom":
+        model.compile(loss=loss_combined, optimizer=optimizer)
+    elif loss=="averagePrecision":
+        model.compile(loss=averagePrecision_loss, optimizer=optimizer)
+    else:
+        model.compile(loss=loss, optimizer=optimizer)
+        
+    return model
+
+
 def model_segmentation_classification(params):
 
     h=params['h']

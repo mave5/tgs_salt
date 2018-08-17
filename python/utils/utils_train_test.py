@@ -947,7 +947,6 @@ def train_test_evalMetric(data,params_train,model):
     train_status='completed!'
     return train_status    
 
-
 def overlay_contour(img,mask):
     mask=np.array(mask,"uint8")
     im2, contours, hierarchy = cv2.findContours(mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)

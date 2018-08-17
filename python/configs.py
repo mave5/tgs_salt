@@ -16,9 +16,9 @@ import json
 # =============================================================================
 # Initial Configs
 # =============================================================================
-#img_height,img_width,img_channel=101,101,1 # image dimensions
-img_height,img_width,img_channel=128,128,1 # image dimensions
-numOfInputConvFilters=32 # number of input conv filters
+img_height,img_width,img_channel=101,101,1 # image dimensions
+#img_height,img_width,img_channel=128,128,1 # image dimensions
+numOfInputConvFilters=16 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
@@ -304,8 +304,8 @@ if configsDF is None:
             'reshape4softmax': False,
             "data_format": 'channels_first',
             "augmentation": True,
-            #"cropping_padding": (13,14),
-            "cropping_padding": (0,0),
+            "cropping_padding": (13,14),
+            #"cropping_padding": (0,0),
             "evalMetric": "evalMetric",
             #"cropping_padding": (0,0),
             }
