@@ -18,13 +18,13 @@ import json
 # =============================================================================
 img_height,img_width,img_channel=101,101,1 # image dimensions
 #img_height,img_width,img_channel=128,128,1 # image dimensions
-numOfInputConvFilters=16 # number of input conv filters
+numOfInputConvFilters=32 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
-agileIterationNum="2" # iteration number
+agileIterationNum="3" # iteration number
 seed = 2018 # fix random seed for reproducibility
 initialLearningRate=2e-4
 nonZeroMasksOnly=True

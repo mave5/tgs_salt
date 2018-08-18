@@ -16,6 +16,180 @@ from glob import glob
 #from scipy.ndimage.filters import gaussian_filter
 
 
+
+def gammaAugmentImage(image,gamma=0.1):
+    if np.random.random()<0.5:
+        g_rand=(2 * np.random.rand() - 1) # random number between -1 to +1
+        g = g_rand * gamma + 1.
+    else:
+        g= 1
+    image=(255 * (image / 255.) ** g).astype("uint8")
+    return image    
+
+def gammaAugmentBatch(X,gamma=0.1):
+    n,c,h,w=X.shape
+    for i in range(n):
+        X[i]=gammaAugmentImage(X[i],gamma)
+    return X
+
+
+def randomCroppingImage(image,alfaMax=0.06):
+    C,H,W=image.shape
+    if np.random.rand()<0.5:
+        alfaH,alfaW=np.random.uniform(0.0,alfaMax),np.random.uniform(0.0,alfaMax)             
+        dH,dW=int(alfaH*H),int(alfaW*W)            
+        h0=np.random.randint(0,H-dH)
+        w0=np.random.randint(0,W-dW)
+        randomPixels=np.random.uniform(0.0,np.max(image),size=(dH,dW)) # data type is float
+        #randomPixels=np.random.randint(0,np.max(image),size=(dH,dW))
+        image[:,h0:h0+dH,w0:w0+dW]=randomPixels # data type with the same as image
+    return image        
+
+def randomCroppingBatch(X,alfaMax=0.1):
+    # alfaMax: size of erasing: percentage of H and W
+    N,C,H,W=X.shape
+    for k in range(N):
+        X[k]=randomCroppingImage(X[k],alfaMax)
+    return X    
+
+
+def train_test_evalMetric_preprocess(data,params_train,model):
+    X_train,Y_train,X_test,Y_test=data
+    foldnm=params_train['foldnm']  
+    pre_train=params_train['pre_train'] 
+    batch_size=params_train['batch_size'] 
+    augmentation=params_train['augmentation'] 
+    weightfolder=params_train['weightfolder'] 
+    path2weights=params_train['path2weights'] 
+    normalizationParams=params_train["normalizationParams"]
+    augmentationParams=params_train["augmentationParams"]
+    nbepoch=params_train["nbepoch"]
+    path2model=os.path.join(weightfolder,"model.hdf5")    
+    
+    print('batch_size: %s, Augmentation: %s' %(batch_size,augmentation))
+    print ('fold %s training in progress ...' %foldnm)
+    
+    # load last weights
+    if pre_train== True:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print ('previous weights loaded!')
+        else:
+            raise IOError('weights does not exist!!!')
+    else:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print (path2weights)
+            print ('previous weights loaded!')
+            train_status='previous weights'
+            return train_status
+    
+    # path to csv file to save scores
+    path2scorescsv = os.path.join(weightfolder,'scores.csv')
+    first_row = 'train,test'
+    with open(path2scorescsv, 'w+') as f:
+        f.write(first_row + '\n')
+           
+    # initialize     
+    start_time=time.time()
+    scores_test=[]
+    scores_train=[]
+    if params_train['evalMetric']=='evalMetric': 
+        best_score = 0
+        previous_score = 0
+    else:
+        best_score = 1e6
+        previous_score = 1e6
+    patience = 0
+    
+
+    
+    for epoch in range(params_train['nbepoch']):
+        
+        # perform random cropping/erasing
+        X_train_=randomCroppingBatch(X_train)
+        
+        # augmentation data generator
+        train_generator,steps_per_epoch=data_generator(X_train_,Y_train,batch_size,augmentationParams)
+        
+    
+        print ('epoch: %s / %s,  Current Learning Rate: %.1e' %(epoch,nbepoch,model.optimizer.lr.get_value()))
+        #seed = np.random.randint(0, 999999)
+    
+        if augmentation:
+            
+            hist=model.fit_generator(train_generator,steps_per_epoch=steps_per_epoch,epochs=1, verbose=0)
+            #X_batch,Y_batch=iterate_minibatches(X_train,y_train,X_train.shape[0],shuffle=False,augment=True)  
+            #hist=model.fit(preprocess(X_batch,normalizationParams), Y_batch, batch_size=batch_size,epochs=1, verbose=0)
+        else:
+            hist=model.fit(preprocess(X_train,normalizationParams), Y_train, batch_size=batch_size,epochs=1, verbose=0)
+            
+        # evaluate on test and train data
+        score_test=model.evaluate(preprocess(X_test,normalizationParams),Y_test,verbose=0)
+        score_train=np.mean(hist.history['loss'])
+       
+        print ('score_train: %s, score_test: %s' %(score_train,score_test))
+        scores_test=np.append(scores_test,score_test)
+        scores_train=np.append(scores_train,score_train)    
+
+        # evaluation metric        
+        Y_pred=model.predict(preprocess(X_test,normalizationParams))>=0.5
+        evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
+        print('eval metric: %.2f' %evalMetricPerFold)
+        score_test=evalMetricPerFold
+
+        # check for improvement    
+        if (score_test>=best_score):
+            print ("!!!!!!!!!!!!!!!!!!!!!!!!!!! viva, improvement!!!!!!!!!!!!!!!!!!!!!!!!!!!") 
+            best_score = score_test
+            patience = 0
+            model.save_weights(path2weights)  
+            model.save(path2model)
+            
+        # learning rate schedule
+        if score_test<previous_score:
+            #print "Incrementing Patience."
+            patience += 1
+
+        # learning rate schedule                
+        if patience == params_train['max_patience']:
+            params_train['learning_rate'] = params_train['learning_rate']/2
+            print ("Upating Current Learning Rate to: ", params_train['learning_rate'])
+            model.optimizer.lr.set_value(params_train['learning_rate'])
+            print ("Loading the best weights again. best_score: ",best_score)
+            model.load_weights(path2weights)
+            patience = 0
+        
+        # save current test score
+        previous_score = score_test    
+        
+        # store scores into csv file
+        with open(path2scorescsv, 'a') as f:
+            string = str([score_train,score_test])
+            f.write(string + '\n')
+           
+    
+    print ('model was trained!')
+    elapsed_time=(time.time()-start_time)/60
+    print ('elapsed time: %d  mins' %elapsed_time)      
+
+    # train test progress plots
+    plt.figure(figsize=(10,10))
+    plt.plot(scores_test)
+    plt.plot(scores_train)
+    plt.title('train-validation progress',fontsize=20)
+    plt.legend(('test','train'),fontsize=20)
+    plt.xlabel('epochs',fontsize=20)
+    plt.ylabel('loss',fontsize=20)
+    plt.grid(True)
+    plt.savefig(weightfolder+'/train_val_progress.png')
+    plt.show()
+    
+    print ('training completed!')
+    train_status='completed!'
+    return train_status    
+
+
 def gammaAugment(image,gamma=0.1):
     if np.random.random()<0.5:
         g_rand=(2 * np.random.rand() - 1) # random number between -1 to +1
@@ -393,9 +567,9 @@ def trainNfolds(X,Y,configs):
         model=createModel(configs,configs.showModelSummary)
         
         data=X_train,Y_train,X_test,Y_test
-        #train_test_model(data,trainingParams,model)
-        train_test_evalMetric(data,trainingParams,model)
-        
+        #train_test_model(data,trainingParams,model) # best model is saved based on loss value
+        #train_test_evalMetric(data,trainingParams,model) # best model is stored based on eval metric
+        train_test_evalMetric_preprocess(data,trainingParams,model) # data is preprocessed before augmentation
         
         # loading best weights from training session
         if  os.path.exists(path2weights):
@@ -528,7 +702,7 @@ def data_generator(X_train,Y_train,batch_size,augmentationParams):
     mask_datagen = ImageDataGenerator(**augmentationParams_mask)
     
     # Provide the same seed and keyword arguments to the fit and flow methods
-    seed = 1
+    seed = np.random.randint(1e6)
     image_datagen.fit(X_train, augment=True, seed=seed)
     mask_datagen.fit(Y_train, augment=True, seed=seed)
     
@@ -545,7 +719,7 @@ def data_generator(X_train,Y_train,batch_size,augmentationParams):
 def data_generator_classification(X_train,y_train,batch_size,augmentationParams):
     image_datagen = ImageDataGenerator(**augmentationParams)
     
-    seed=1
+    seed=np.random.randint(1e6)
     image_datagen.fit(X_train, augment=True, seed=seed)
     
     image_generator = image_datagen.flow(X_train,y_train,batch_size=batch_size,seed=seed)
