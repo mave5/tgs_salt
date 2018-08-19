@@ -1405,7 +1405,7 @@ def load_pickle(path2pickle):
     return X,Y.astype("uint8"),ids,depths
 
 def load_data_depth(configs,data_type="train"):
-    path2pickle=os.path.join(configs.path2data,data_type+".p")
+    path2pickle=os.path.join(configs.path2data,data_type+"_depths.p")
     if os.path.exists(path2pickle):
         return load_pickle(path2pickle)
     

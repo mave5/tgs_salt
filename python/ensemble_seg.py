@@ -21,7 +21,7 @@ if not os.path.exists(path2predictions):
 # =============================================================================
 # list of experiments to be ensembled
 # =============================================================================
-experiments=["0.2.5","0.2.10","0.2.3"]
+experiments=["0.2.5","0.2.10"]
 Y_pred_ensemble=utils_train_test.getOutputEnsemble(path2allExperiments,experiments,data_type="train")    
 utils_train_test.storePredictionsEnsemble(path2predictions,Y_pred_ensemble,"train")
 del Y_pred_ensemble
