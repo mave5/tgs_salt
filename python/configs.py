@@ -247,7 +247,7 @@ else:
 #==============================================================================
 # Elastic Parameters
 #==============================================================================
-elastic_arg = {'elastic_probability': 0.5,
+elastic_arg = {'elastic_probability': 0.1,
                'nr_of_random_transformations': 1000,  # x and y transformation are separate so total nr is N*N
                'alpha': 2.0,
                'sigma': 0.1
@@ -308,6 +308,8 @@ if configsDF is None:
             #"cropping_padding": (0,0),
             "evalMetric": "evalMetric",
             #"cropping_padding": (0,0),
+            "randomCropping": False,
+            "elasticTransform": True,
             }
 else:
     trainingParams=configsDF.loc[configsDF['Name']=='trainingParams','Value'].tolist()[0]
@@ -347,6 +349,8 @@ if configsDF is None:
             "model_version":experiment,
             "nonZeroMasksOnly": nonZeroMasksOnly,
             "pre_settings": pre_settings,
+            "padSize": padSize,
+            "path2predictions": path2predictions,
             }
     col1=list(colsDict.keys())
     col2=list(colsDict.values())

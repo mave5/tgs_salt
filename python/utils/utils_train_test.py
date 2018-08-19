@@ -1,7 +1,8 @@
+import os
+os.environ['KERAS_BACKEND'] = 'theano'
 from keras.preprocessing import image
 from keras.preprocessing.image import ImageDataGenerator
 import pickle
-import os
 import numpy as np
 import matplotlib.pylab as plt
 import cv2
@@ -12,9 +13,43 @@ from sklearn.model_selection import StratifiedShuffleSplit
 import pandas as pd
 import datetime
 from glob import glob
+from keras.models import load_model
 # elastic augmentation
 #from scipy.ndimage.filters import gaussian_filter
 
+
+def generate_smooth_transformation_fields(im_shape, elastic_args):
+    # typical values: nr_transformations=1000, alpha=2, sigma=.1
+    nr_transformations=elastic_args["nr_of_random_transformations"]
+    alpha=elastic_args["alpha"]
+    sigma=elastic_args["sigma"]
+    
+    alpha *= (np.prod(im_shape) ** 0.5)
+    sigma *= (np.prod(im_shape) ** 0.5)
+    smooth_transformation_fields = np.zeros((nr_transformations, im_shape[0], im_shape[1]), dtype=np.float32)
+    for t in range(nr_transformations):
+        rand = np.random.rand(*im_shape) * 2 - 1
+        smooth_transformation_fields[t] = cv2.GaussianBlur(rand, (0, 0), sigma, borderType=cv2.BORDER_CONSTANT) * alpha
+    return smooth_transformation_fields
+
+# smooth_transformation_fields is a numpy array of N precalculated fields of dimensions N*h*w
+def elastic_transform_multi_fast(x, y, kwargs, smooth_transformation_fields):
+    N = smooth_transformation_fields.shape[0]
+    x_t = x.copy()
+    y_t = np.zeros_like(x) if y is None else y.copy()
+
+    x_grid, y_grid = np.meshgrid(np.arange(x.shape[3]), np.arange(x.shape[2]))
+
+    for k in range(x.shape[0]):
+        if np.random.random() < kwargs['elastic_probability']:
+            #Generate X and Y coordinates from random transformation + grid
+            x_coords = (smooth_transformation_fields[np.random.randint(0, N)] + x_grid).astype('float32')
+            y_coords = (smooth_transformation_fields[np.random.randint(0, N)] + y_grid).astype('float32')
+
+            x_t[k, :] = cv2.remap(x[k, 0], x_coords, y_coords, cv2.INTER_CUBIC)
+            for k2 in range(y.shape[1]):
+                y_t[k, k2, :] = cv2.remap(y[k, k2, :], x_coords, y_coords, cv2.INTER_CUBIC)
+    return x_t.astype('uint8'), y_t.astype('uint8')
 
 
 def gammaAugmentImage(image,gamma=0.1):
@@ -65,6 +100,7 @@ def train_test_evalMetric_preprocess(data,params_train,model):
     augmentationParams=params_train["augmentationParams"]
     nbepoch=params_train["nbepoch"]
     path2model=os.path.join(weightfolder,"model.hdf5")    
+    elastic_arg=params_train["elastic_arg"]
     
     print('batch_size: %s, Augmentation: %s' %(batch_size,augmentation))
     print ('fold %s training in progress ...' %foldnm)
@@ -102,21 +138,28 @@ def train_test_evalMetric_preprocess(data,params_train,model):
         previous_score = 1e6
     patience = 0
     
-
+    # elstic transformation
+    smooth_transformation_fields = generate_smooth_transformation_fields(X_train.shape[2:],elastic_arg)
     
     for epoch in range(params_train['nbepoch']):
         
         # perform random cropping/erasing
-        X_train_=randomCroppingBatch(X_train)
-        
-        # augmentation data generator
-        train_generator,steps_per_epoch=data_generator(X_train_,Y_train,batch_size,augmentationParams)
-        
+        #if params_train["randomCropping"] is True:
+            #X_train_t=randomCroppingBatch(X_train)
+
+        # perform elastic transformation
+        if params_train["elasticTransform"] is True:
+            X_train_t,Y_train_t=elastic_transform_multi_fast(X_train,Y_train,elastic_arg,smooth_transformation_fields)
+        else:
+            X_train_t,Y_train_t=X_train.copy(),Y_train.copy()
+
     
         print ('epoch: %s / %s,  Current Learning Rate: %.1e' %(epoch,nbepoch,model.optimizer.lr.get_value()))
         #seed = np.random.randint(0, 999999)
     
         if augmentation:
+            # augmentation data generator
+            train_generator,steps_per_epoch=data_generator(X_train_t,Y_train_t,batch_size,augmentationParams)
             
             hist=model.fit_generator(train_generator,steps_per_epoch=steps_per_epoch,epochs=1, verbose=0)
             #X_batch,Y_batch=iterate_minibatches(X_train,y_train,X_train.shape[0],shuffle=False,augment=True)  
@@ -216,6 +259,36 @@ def padArrays(X,Y,padSize=(13,14)):
     return X,Y    
 
 
+def getOutputEnsemble(path2allExperiments,experiments,data_type="train"):
+    Y_predAllExperiments=[]
+    for experiment in experiments:
+        path2experiment=os.path.join(path2allExperiments,experiment)
+        path2predictions=os.path.join(path2experiment,"predictions")
+    
+        # load predictions
+        path2pickle=glob(path2predictions+"/Y_pred_"+data_type+"*.p")[0]
+        data = pickle.load( open( path2pickle, "rb" ) )
+        Y_pred=data["Y"]
+        array_stats(Y_pred)
+        disp_imgs_masks(Y_pred,Y_pred>=0.5)
+        Y_predAllExperiments.append(Y_pred)        
+    
+    # convert to array
+    Y_predAllExperiments=np.hstack(Y_predAllExperiments)
+    print ('ensemble shape:', Y_predAllExperiments.shape)
+    Y_pred_ensemble=np.mean(Y_predAllExperiments,axis=1)[:,np.newaxis] #>=0.5
+    array_stats(Y_pred_ensemble)
+    
+    return Y_pred_ensemble
+
+
+def storePredictionsEnsemble(path2predictions,Y_pred,suffix=""):
+    path2pickle=os.path.join(path2predictions,"Y_pred_"+suffix+"_ensemble.p")    
+    data = { "Y": Y_pred }
+    pickle.dump( data, open( path2pickle, "wb" ) )
+    print("predictions stored!")
+    return
+
 def storePredictions(configs,Y_pred,suffix=""):
     path2pickle=os.path.join(configs.path2predictions,"Y_pred_"+suffix+"_"+configs.experiment+".p")    
     data = { "Y": Y_pred }
@@ -266,6 +339,25 @@ def createSubmission(rlcDict,configs):
     submissionDF.to_csv(path2submission)
     submissionDF.head()
     
+
+def createSubmissionEnsemble(rlcDict,path2experiment):
+    submissionDF = pd.DataFrame.from_dict(rlcDict,orient='index')
+    submissionDF.index.names = ['id']
+    submissionDF.columns = ['rle_mask']    
+
+    # Create submission DataFrame
+    now = datetime.datetime.now()
+    info="ensemble"
+    
+    suffix = info + '_' + str(now.strftime("%Y-%m-%d-%H-%M"))
+    submissionFolder=os.path.join(path2experiment,"submissions")
+    if not os.path.exists(submissionFolder):
+        os.mkdir(submissionFolder)
+        print(submissionFolder+ ' created!')
+    path2submission = os.path.join(submissionFolder, 'submission_' + suffix + '.csv')
+    print(path2submission)
+    submissionDF.to_csv(path2submission)
+    submissionDF.head()
 
 
 def converMasksToRunLengthDict(Y_leaderboard,ids_leaderboard):
@@ -337,7 +429,7 @@ def getOutputAllFolds_classification(X,configs):
     return Y_pred        
 
 
-def getOutputAllFolds(X,configs,binaryMask=True):
+def getOutputAllFolds(X,configs,binaryMask=False):
     nFolds=configs.nFolds
     Y_predAllFolds=[]
     for foldnm in range(1,nFolds+1):
@@ -359,6 +451,7 @@ def getOutputAllFolds(X,configs,binaryMask=True):
         
     return Y_leaderboard        
 
+
 def getYperFold(X,configs,foldnm):
     # load weights
     model=createModel(configs)    
@@ -371,6 +464,44 @@ def getYperFold(X,configs,foldnm):
         print ('%s loaded!' %path2weights)
     else:
         raise IOError ('weights does not exist!')
+
+    # prediction
+    Y_pred=model.predict(preprocess(X,configs.normalizationParams))
+    return Y_pred
+
+def getOutputAllFolds_loadModel(X,configs,binaryMask=False):
+    nFolds=configs.nFolds
+    Y_predAllFolds=[]
+    for foldnm in range(1,nFolds+1):
+        print('fold: %s' %foldnm)
+    
+        Y_pred=getYperFold_loadModel(X,configs,foldnm)    
+        array_stats(Y_pred)
+        disp_imgs_masks(X,Y_pred>=configs.maskThreshold)
+        Y_predAllFolds.append(Y_pred)        
+        print('-'*50)
+        
+    # convert to array
+    Y_predAllFolds=np.hstack(Y_predAllFolds)
+    print ('ensemble shape:', Y_predAllFolds.shape)
+    Y_leaderboard=np.mean(Y_predAllFolds,axis=1)[:,np.newaxis] #>=0.5
+    if binaryMask is True:
+        Y_leaderboard=Y_leaderboard>=configs.maskThreshold    
+    array_stats(Y_leaderboard)
+        
+    return Y_leaderboard        
+
+def getYperFold_loadModel(X,configs,foldnm):
+    # load model
+    modelFolder=os.path.join(configs.path2experiment,"fold"+str(foldnm))
+    
+    # path to weights
+    path2model=os.path.join(modelFolder,"model.hdf5")
+    if  os.path.exists(path2model):
+        model=load_model(path2model)
+        print ('%s loaded!' %path2model)
+    else:
+        raise IOError ('model does not exist!')
 
     # prediction
     Y_pred=model.predict(preprocess(X,configs.normalizationParams))
@@ -1310,6 +1441,18 @@ def load_data_depth(configs,data_type="train"):
     
     # load
     return load_pickle(path2pickle)
+
+def load_data_ensemble(path2data,data_type="train"):
+
+    path2pickle=os.path.join(path2data,data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        X=data["X"]
+        Y=data["Y"]
+        ids=data["ids"]
+        return X,Y.astype("uint8"),ids
+    else:
+        raise IOError("data does not exist!")
 
 def load_data(configs,data_type="train"):
 
