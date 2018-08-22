@@ -226,7 +226,7 @@ def train_test_evalMetric_preprocess(data,params_train,model):
     plt.ylabel('loss',fontsize=20)
     plt.grid(True)
     plt.savefig(weightfolder+'/train_val_progress.png')
-    plt.show()
+    #plt.show()
     
     print ('training completed!')
     train_status='completed!'
@@ -262,6 +262,7 @@ def padArrays(X,Y,padSize=(13,14)):
 def getOutputEnsemble(path2allExperiments,experiments,data_type="train"):
     Y_predAllExperiments=[]
     for experiment in experiments:
+        print("experiment:%s" %experiment)
         path2experiment=os.path.join(path2allExperiments,experiment)
         path2predictions=os.path.join(path2experiment,"predictions")
     
@@ -982,7 +983,7 @@ def train_test_classification(data,params_train,model):
     plt.ylabel('loss',fontsize=20)
     plt.grid(True)
     plt.savefig(weightfolder+'/train_val_progress.png')
-    plt.show()
+    #plt.show()
     
     print ('training completed!')
     train_status='completed!'
@@ -1115,7 +1116,7 @@ def train_test_model(data,params_train,model):
     plt.ylabel('loss',fontsize=20)
     plt.grid(True)
     plt.savefig(weightfolder+'/train_val_progress.png')
-    plt.show()
+    #plt.show()
     
     print ('training completed!')
     train_status='completed!'
@@ -1246,7 +1247,7 @@ def train_test_evalMetric(data,params_train,model):
     plt.ylabel('loss',fontsize=20)
     plt.grid(True)
     plt.savefig(weightfolder+'/train_val_progress.png')
-    plt.show()
+    #plt.show()
     
     print ('training completed!')
     train_status='completed!'
@@ -1274,7 +1275,8 @@ def disp_imgs_masks_labels(X,y,r=2,c=3):
         plt.imshow(img,cmap="gray");        
         plt.text(5,h-5,label,fontsize=12)
         plt.title(ind)    
-    plt.show()
+    #plt.show()
+    plt.draw()	
  
 def disp_imgs_masks(X,Y,r=2,c=3):
     assert np.ndim(X)==np.ndim(Y)        
@@ -1288,7 +1290,9 @@ def disp_imgs_masks(X,Y,r=2,c=3):
         plt.subplot(r,c,k+1)
         plt.imshow(img,cmap="gray");        
         plt.title(ind)    
-    plt.show()
+    #plt.show()
+    plt.draw()
+
 def array_stats(X):
     X=np.asarray(X)
     print ('array shape: ',X.shape, X.dtype)
