@@ -17,7 +17,7 @@ import json
 # Initial Configs
 # =============================================================================
 img_height,img_width,img_channel=101,101,2 # image dimensions
-numOfInputConvFilters=16 # number of input conv filters
+numOfInputConvFilters=32 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.2 # portion of data to be used for local test during training
@@ -224,11 +224,13 @@ pp_func=getattr(thismodule, "preprocessing_function")
 if configsDF is None:
     augmentationParams = dict(samplewise_center=False,
                               samplewise_std_normalization=False,
-                         rotation_range=10.,
+                         rotation_range=10,
                          width_shift_range=0.1,
                          height_shift_range=0.1,
                          zoom_range=0.05,
                          shear_range=0.1,
+                         horizontal_flip=True,
+                         vertical_flip=True,
                          preprocessing_function=pp_func,
                          )
 else:

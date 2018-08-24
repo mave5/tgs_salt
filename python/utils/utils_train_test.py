@@ -273,6 +273,7 @@ def getOutputEnsemble(path2allExperiments,experiments,data_type="train"):
         array_stats(Y_pred)
         disp_imgs_masks(Y_pred,Y_pred>=0.5)
         Y_predAllExperiments.append(Y_pred)        
+        print("-"*50)
     
     # convert to array
     Y_predAllExperiments=np.hstack(Y_predAllExperiments)
@@ -284,7 +285,7 @@ def getOutputEnsemble(path2allExperiments,experiments,data_type="train"):
 
 
 def storePredictionsEnsemble(path2predictions,Y_pred,suffix=""):
-    path2pickle=os.path.join(path2predictions,"Y_pred_"+suffix+"_ensemble.p")    
+    path2pickle=os.path.join(path2predictions,"Y_pred_"+suffix+".p")    
     data = { "Y": Y_pred }
     pickle.dump( data, open( path2pickle, "wb" ) )
     print("predictions stored!")
@@ -341,14 +342,14 @@ def createSubmission(rlcDict,configs):
     submissionDF.head()
     
 
-def createSubmissionEnsemble(rlcDict,path2experiment):
+def createSubmissionEnsemble(rlcDict,path2experiment,info="ensemble"):
     submissionDF = pd.DataFrame.from_dict(rlcDict,orient='index')
     submissionDF.index.names = ['id']
     submissionDF.columns = ['rle_mask']    
 
     # Create submission DataFrame
     now = datetime.datetime.now()
-    info="ensemble"
+    #info="ensemble"
     
     suffix = info + '_' + str(now.strftime("%Y-%m-%d-%H-%M"))
     submissionFolder=os.path.join(path2experiment,"submissions")
@@ -1260,6 +1261,26 @@ def overlay_contour(img,mask):
     return img   
 
 
+def disp_imgs_2masks_labels(X,Y_pred,y,r=2,c=3):
+    assert len(X)==len(y)        
+    n=r*c
+    plt.figure(figsize=(12,8))
+    indices=np.random.randint(len(X),size=n)
+    for k,ind in enumerate(indices):
+        img=X[ind,0]
+        mask=X[ind,1]>=0.5
+        mask2=Y_pred[ind,0]>=0.5
+        img=overlay_contour(img,mask)    
+        img=overlay_contour(img,mask2)    
+        h,w=img.shape
+        label=y[ind]
+        plt.subplot(r,c,k+1)
+        plt.imshow(img,cmap="gray");        
+        plt.text(5,h-5,label,fontsize=12)
+        plt.title(ind)    
+    #plt.show()
+    plt.draw()	
+
 def disp_imgs_masks_labels(X,y,r=2,c=3):
     assert len(X)==len(y)        
     n=r*c
@@ -1349,7 +1370,9 @@ def load_data_classify_prob(configs,data_type="train"):
 
     # loading predictions
     path2pickle=glob(configs.path2data+"Y_pred_"+data_type+"*.p")[0]
-    seg_model_version=path2pickle.split("_")[3][:-2] # get seg model version
+    baseName=os.path.basename(path2pickle)
+    lenOfPrefix=len("Y_pred_"+data_type)
+    seg_model_version=baseName[lenOfPrefix+1:-2]# path2pickle.split("_")[3][:-2] # get seg model version
     configs.seg_model_version=seg_model_version # store model version
     #path2pickle=os.path.join(configs.path2data,"Y_pred_"+data_type+".p")
     if os.path.exists(path2pickle):

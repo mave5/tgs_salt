@@ -231,6 +231,8 @@ if configsDF is None:
                          rotation_range=10.,
                          width_shift_range=0.1,
                          height_shift_range=0.1,
+                         horizontal_flip=True,
+                         vertical_flip=True,
                          zoom_range=0.05,
                          shear_range=0.1,
                          preprocessing_function=pp_func,

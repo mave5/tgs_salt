@@ -21,13 +21,15 @@ if not os.path.exists(path2predictions):
 # =============================================================================
 # list of experiments to be ensembled
 # =============================================================================
-experiments=["0.2.5","0.2.10"]
+experiments=["0.2.5","0.2.10","0.3.4"]
+experimentsJoin="".join("_"+e for e in experiments)
+
 Y_pred_ensemble=utils_train_test.getOutputEnsemble(path2allExperiments,experiments,data_type="train")    
-utils_train_test.storePredictionsEnsemble(path2predictions,Y_pred_ensemble,"train")
+utils_train_test.storePredictionsEnsemble(path2predictions,Y_pred_ensemble,"train"+experimentsJoin)
 del Y_pred_ensemble
 
 Y_leaderboard=utils_train_test.getOutputEnsemble(path2allExperiments,experiments,data_type="test")    
-utils_train_test.storePredictionsEnsemble(path2predictions,Y_leaderboard,"test")
+utils_train_test.storePredictionsEnsemble(path2predictions,Y_leaderboard,"test"+experimentsJoin)
 
 # =============================================================================
 # convert outputs to Run Length Dict
@@ -38,7 +40,7 @@ rlcDict=utils_train_test.converMasksToRunLengthDict(Y_leaderboard>=maskThreshold
 # =============================================================================
 # crate submission
 # =============================================================================
-utils_train_test.createSubmissionEnsemble(rlcDict,path2Ensemble)
+utils_train_test.createSubmissionEnsemble(rlcDict,path2Ensemble,info=experimentsJoin)
 
 
 
