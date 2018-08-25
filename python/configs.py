@@ -287,7 +287,7 @@ if configsDF is None:
             #'loss': 'binary_crossentropy',
             "loss": "custom",
             #"loss": "averagePrecision",
-            #"loss": "custom",
+            #"loss": "iou_loss",
             'nbepoch': numOfEpochs,
             'numOfOutputs': 1,
             'initial_channels':numOfInputConvFilters,

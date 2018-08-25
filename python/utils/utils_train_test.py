@@ -18,6 +18,14 @@ from keras.models import load_model
 #from scipy.ndimage.filters import gaussian_filter
 
 
+def rotateData(X,rotationAngle=180):
+    n,c,h,w=X.shape
+    Xr=np.zeros_like(X)
+    for k in range(n):
+        for k2 in range(c):
+            Xr[k,k2]=np.rot90(X[k,k2],rotationAngle/90)
+    return Xr
+
 def generate_smooth_transformation_fields(im_shape, elastic_args):
     # typical values: nr_transformations=1000, alpha=2, sigma=.1
     nr_transformations=elastic_args["nr_of_random_transformations"]
@@ -729,6 +737,91 @@ def trainNfolds(X,Y,configs):
     print ('average eval metric for %s folds is %s' %(nFolds,np.mean(evalMatric_nfolds)))
     print("-"*50)
     return evalMatric_nfolds
+
+
+def trainNfoldsWithTestAugment(X,Y,configs):
+    nFolds=configs.nFolds
+    skf = ShuffleSplit(n_splits=nFolds, test_size=configs.test_size, random_state=321)
+    
+    # loop over folds
+    foldnm=0
+    scores_nfolds=[]
+    evalMatric_nfolds=[]
+    dice_nfolds=[]
+    maskThreshold=configs.maskThreshold
+    
+    print ('wait ...')
+    for train_ind, test_ind in skf.split(X,Y):
+        foldnm+=1    
+    
+        train_ind=list(np.sort(train_ind))
+        test_ind=list(np.sort(test_ind))
+        
+        X_train,Y_train=X[train_ind],np.array(Y[train_ind],'uint8')
+        X_test,Y_test=X[test_ind],np.array(Y[test_ind],'uint8')
+        
+        array_stats(X_train)
+        array_stats(Y_train)
+        array_stats(X_test)
+        array_stats(Y_test)
+        print ('-'*30)
+    
+        weightfolder=os.path.join(configs.path2experiment,"fold"+str(foldnm))
+        if  not os.path.exists(weightfolder):
+            os.makedirs(weightfolder)
+            print (weightfolder +' created')    
+    
+        # path to weights
+        path2weights=os.path.join(weightfolder,"weights.hdf5")
+        
+        # train test on fold #
+        trainingParams=configs.trainingParams
+        trainingParams['foldnm']=foldnm
+        trainingParams['learning_rate']=configs.initialLearningRate
+        trainingParams['weightfolder']=weightfolder
+        trainingParams['path2weights']=path2weights
+
+        # create model        
+        model=createModel(configs,configs.showModelSummary)
+        
+        data=X_train,Y_train,X_test,Y_test
+        #train_test_model(data,trainingParams,model) # best model is saved based on loss value
+        #train_test_evalMetric(data,trainingParams,model) # best model is stored based on eval metric
+        train_test_evalMetric_preprocess(data,trainingParams,model) # data is preprocessed before augmentation
+        
+        # loading best weights from training session
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print ('weights loaded!')
+        else:
+            raise IOError('weights does not exist!!!')
+        
+        score_test=model.evaluate(preprocess(X_test,configs.normalizationParams),Y_test,verbose=0,batch_size=8)
+        print ('score_test: %.5f' %(score_test))    
+        
+        Y_pred=np.zeros_like(Y_test,dtype=np.float32)
+        rotationAngles=[0,90,180,270]
+        for rotA in rotationAngles:
+            X_test_rot=rotateData(X_test,rotationAngle=rotA)
+            Y_pred_rot=model.predict(preprocess(X_test_rot,configs.normalizationParams))#>=maskThreshold
+            Y_pred+=rotateData(Y_pred_rot,rotationAngle=-rotA)/len(rotationAngles)
+        Y_pred=(Y_pred>=maskThreshold)
+        dicePerFold,_=calc_dice(Y_test,Y_pred)
+        evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
+        print('average dice: %.2f' %dicePerFold)
+        print('eval metric: %.2f' %evalMetricPerFold)
+        print ('-' *30)
+        # store scores for all folds
+        scores_nfolds.append(score_test)
+        dice_nfolds.append(dicePerFold)
+        evalMatric_nfolds.append(evalMetricPerFold)
+    
+    print ('average score for %s folds is %s' %(nFolds,np.mean(scores_nfolds)))
+    print ('average dice for %s folds is %s' %(nFolds,np.mean(dice_nfolds)))
+    print ('average eval metric for %s folds is %s' %(nFolds,np.mean(evalMatric_nfolds)))
+    print("-"*50)
+    return evalMatric_nfolds
+
 
 def computeEvalMetric(Y1,Y2):
     # Y1 and Y2 shape N*C*H*W

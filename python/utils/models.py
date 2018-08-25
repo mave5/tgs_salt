@@ -19,6 +19,8 @@ from keras import losses
 _EPSILON = K.epsilon()
 
 
+
+
 def iou_tensor(y_true, y_pred):
     y_pred = K.clip(y_pred, _EPSILON, 1.0-_EPSILON)
     smooth=_EPSILON
@@ -72,15 +74,16 @@ def jacard_coef(y_true, y_pred):
 
 
 def intersectionOverUnion(y_true, y_pred):
-    smooth=1
+    smooth=_EPSILON
     y_true_f = K.batch_flatten(y_true)
     y_pred_f = K.batch_flatten(y_pred)
-    intersection = K.sum(y_true_f * y_pred_f, axis=1, keepdims=True) + smooth
-    union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) + smooth-intersection
-    return K.mean(intersection / union)
+    intersection = K.sum(y_true_f * y_pred_f, axis=1, keepdims=True) 
+    union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) - intersection
+    return K.mean((intersection+ smooth) / (union+ smooth))
 
 def iou_loss(y_true, y_pred):
-    return -intersectionOverUnion(y_true, y_pred)
+    loss=1-jacard_coef(y_true,y_pred)
+    return loss
 
 def dice_coef(y_true, y_pred):
     smooth=1
@@ -302,6 +305,9 @@ def model_skip2(params):
         model.compile(loss=loss_combined, optimizer=optimizer)
     elif loss=="averagePrecision":
         model.compile(loss=averagePrecision_loss, optimizer=optimizer)
+    elif loss=="iou_loss":
+        model.compile(loss=iou_loss, optimizer=optimizer)
+        
     else:
         model.compile(loss=loss, optimizer=optimizer)
         
@@ -412,6 +418,9 @@ def model_skip4(params):
         model.compile(loss=loss_combined, optimizer=optimizer)
     elif loss=="averagePrecision":
         model.compile(loss=averagePrecision_loss, optimizer=optimizer)
+    elif loss=="iou_loss":
+        model.compile(loss=iou_loss, optimizer=optimizer)
+        
     else:
         model.compile(loss=loss, optimizer=optimizer)
         
@@ -520,6 +529,9 @@ def model_skip3(params):
         model.compile(loss=loss_combined, optimizer=optimizer)
     elif loss=="averagePrecision":
         model.compile(loss=averagePrecision_loss, optimizer=optimizer)
+    elif loss=="iou_loss":
+        model.compile(loss=iou_loss, optimizer=optimizer)
+        
     else:
         model.compile(loss=loss, optimizer=optimizer)
         
@@ -628,6 +640,9 @@ def model_segmentation_classification(params):
         model.compile(loss=loss_combined, optimizer=optimizer)
     elif loss=="averagePrecision":
         model.compile(loss=averagePrecision_loss, optimizer=optimizer)
+    elif loss=="iou_loss":
+        model.compile(loss=iou_loss, optimizer=optimizer)
+        
     else:
         model.compile(loss={"segOut":loss, "classifyOut": "binary_crossentropy"}, 
                       loss_weights={'segOut':1.0, 'classifyOut':1.0},optimizer=optimizer)
