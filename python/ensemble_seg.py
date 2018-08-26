@@ -2,6 +2,8 @@
 #import configs
 import os
 from utils import utils_train_test
+import sys
+from utils import utils_config
 
 #%%
 maskThreshold=0.5
@@ -21,7 +23,7 @@ if not os.path.exists(path2predictions):
 # =============================================================================
 # list of experiments to be ensembled
 # =============================================================================
-experiments=["0.2.5","0.2.10","0.3.4"]
+experiments=["0.3.7","0.3.11"]
 experimentsJoin="".join("_"+e for e in experiments)
 
 Y_pred_ensemble=utils_train_test.getOutputEnsemble(path2allExperiments,experiments,data_type="train")    
@@ -31,9 +33,16 @@ del Y_pred_ensemble
 Y_leaderboard=utils_train_test.getOutputEnsemble(path2allExperiments,experiments,data_type="test")    
 utils_train_test.storePredictionsEnsemble(path2predictions,Y_leaderboard,"test"+experimentsJoin)
 
+
 # =============================================================================
 # convert outputs to Run Length Dict
 # =============================================================================
+yesNoDict={"y": "yes",
+           "n": "no",
+           }
+yn=utils_config.getInputFromUser(yesNoDict,"Create submission? ")
+if yn is "no":
+    sys.exit()
 _,_,ids_leaderboard=utils_train_test.load_data_ensemble(path2data,data_type="test")
 rlcDict=utils_train_test.converMasksToRunLengthDict(Y_leaderboard>=maskThreshold,ids_leaderboard)    
 

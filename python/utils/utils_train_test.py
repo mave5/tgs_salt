@@ -186,7 +186,7 @@ def train_test_evalMetric_preprocess(data,params_train,model):
         # evaluation metric        
         Y_pred=model.predict(preprocess(X_test,normalizationParams))>=0.5
         evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
-        print('eval metric: %.2f' %evalMetricPerFold)
+        print('eval metric: %.3f' %evalMetricPerFold)
         score_test=evalMetricPerFold
 
         # check for improvement    
@@ -724,8 +724,8 @@ def trainNfolds(X,Y,configs):
         Y_pred=model.predict(preprocess(X_test,configs.normalizationParams))>=maskThreshold
         dicePerFold,_=calc_dice(Y_test,Y_pred)
         evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
-        print('average dice: %.2f' %dicePerFold)
-        print('eval metric: %.2f' %evalMetricPerFold)
+        print('average dice: %.3f' %dicePerFold)
+        print('eval metric: %.3f' %evalMetricPerFold)
         print ('-' *30)
         # store scores for all folds
         scores_nfolds.append(score_test)
@@ -808,8 +808,8 @@ def trainNfoldsWithTestAugment(X,Y,configs):
         Y_pred=(Y_pred>=maskThreshold)
         dicePerFold,_=calc_dice(Y_test,Y_pred)
         evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
-        print('average dice: %.2f' %dicePerFold)
-        print('eval metric: %.2f' %evalMetricPerFold)
+        print('average dice: %.3f' %dicePerFold)
+        print('eval metric: %.3f' %evalMetricPerFold)
         print ('-' *30)
         # store scores for all folds
         scores_nfolds.append(score_test)
@@ -1162,7 +1162,7 @@ def train_test_model(data,params_train,model):
         # evaluation metric        
         Y_pred=model.predict(preprocess(X_test,normalizationParams))>=0.5
         evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
-        print('eval metric: %.2f' %evalMetricPerFold)
+        print('eval metric: %.3f' %evalMetricPerFold)
         
 
         # check for improvement    
@@ -1293,7 +1293,7 @@ def train_test_evalMetric(data,params_train,model):
         # evaluation metric        
         Y_pred=model.predict(preprocess(X_test,normalizationParams))>=0.5
         evalMetricPerFold,_=computeEvalMetric(Y_test,Y_pred)
-        print('eval metric: %.2f' %evalMetricPerFold)
+        print('eval metric: %.3f' %evalMetricPerFold)
         score_test=evalMetricPerFold
 
         # check for improvement    
