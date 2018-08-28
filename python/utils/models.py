@@ -1061,3 +1061,213 @@ def model_classification_skip3(params):
     return model
 
 
+
+def model_classification_skip4(params):
+    
+    h=params['h']
+    w=params['w']
+    z=params['z']
+    lr=params['learning_rate']
+    loss=params['loss']
+    C=params['initial_channels']
+    numOfOutputs=params['numOfOutputs']
+    dropout_rate=params['dropout_rate']
+    data_format=params["data_format"]
+    batchNorm=params['batchNorm']
+    w2reg=params['w2reg']
+    if w2reg==True:
+        w2reg=l2(1e-4)
+    else:
+        w2reg=None
+    initStride=params['initStride']
+    padding=params["padding"]
+    optimizer=params["optimizer"]
+    activation=params["activation"]
+    
+    xin = Input((z,h, w))
+    x1=conv2dcustom(filters=C,x_input=xin,strides=initStride,w2reg=w2reg,activation=activation,data_format=data_format,padding=padding,pool=True,batchNorm=batchNorm)    
+    x1=conv2dcustom(filters=C,x_input=x1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x1_ident = AveragePooling2D(pool_size=(2*initStride, 2*initStride))(xin)
+    x1_merged = merge([x1, x1_ident],mode='concat', concat_axis=1)
+
+    x2_1=conv2dcustom(filters=3*C,x_input=x1_merged,pool=True,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x2_1=conv2dcustom(filters=3*C,x_input=x2_1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x2_ident = AveragePooling2D()(x1_ident)
+    x2_merged = merge([x2_1,x2_ident],mode='concat', concat_axis=1)
+
+    #by branching we reduce the #params
+    x3_1 = conv2dcustom(filters=8*C,x_input=x2_merged,pool=True,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x3_1 = conv2dcustom(filters=8*C,x_input=x3_1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x3_ident = AveragePooling2D()(x2_ident)
+    x3_merged = merge([x3_1,x3_ident],mode='concat', concat_axis=1)
+
+    x4_1 = conv2dcustom(filters=9*C,x_input=x3_merged,pool=True,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x4_1 = conv2dcustom(filters=9*C,x_input=x4_1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x4_ident = AveragePooling2D()(x3_ident)
+    x4_merged = merge([x4_1,x4_ident],mode='concat', concat_axis=1)    
+
+    x5_1 = conv2dcustom(filters=9*C,x_input=x4_merged,pool=False,w2reg=w2reg,activation=activation,padding="same",batchNorm=batchNorm)    
+    x5_1 = conv2dcustom(filters=9*C,x_input=x5_1,w2reg=w2reg,activation=activation,padding="valid",batchNorm=batchNorm)    
+    
+    # last layer of encoding    
+    flatten_x=Flatten() (x5_1)
+    
+    flatten_x =Dropout(dropout_rate)(flatten_x)
+    
+    
+    output= dense_branch(flatten_x,name='classiflyOut',outsize=numOfOutputs,activation='sigmoid')
+    
+    
+    model = Model(inputs=xin, outputs=output)
+
+    
+    if optimizer=='RMSprop':
+        optimizer = RMSprop(lr)
+    elif optimizer=='Adam':       
+        optimizer = Adam(lr)
+    elif optimizer=='Nadam':       
+        optimizer = Nadam(lr,clipvalue=1.0)        
+    model.compile(loss=loss, optimizer=optimizer)
+
+    return model
+
+
+def model_classification_skip5(params):
+    
+    h=params['h']
+    w=params['w']
+    z=params['z']
+    lr=params['learning_rate']
+    loss=params['loss']
+    C=params['initial_channels']
+    numOfOutputs=params['numOfOutputs']
+    dropout_rate=params['dropout_rate']
+    data_format=params["data_format"]
+    batchNorm=params['batchNorm']
+    w2reg=params['w2reg']
+    if w2reg==True:
+        w2reg=l2(1e-4)
+    else:
+        w2reg=None
+    initStride=params['initStride']
+    padding=params["padding"]
+    optimizer=params["optimizer"]
+    activation=params["activation"]
+    
+    xin = Input((z,h, w))
+    x1=conv2dcustom(filters=C,x_input=xin,strides=initStride,w2reg=w2reg,activation=activation,data_format=data_format,padding=padding,pool=True,batchNorm=batchNorm)    
+    x1=conv2dcustom(filters=C,x_input=x1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x1=conv2dcustom(filters=C,x_input=x1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)        
+    x1_ident = AveragePooling2D(pool_size=(2*initStride, 2*initStride))(xin)
+    x1_merged = merge([x1, x1_ident],mode='concat', concat_axis=1)
+
+    x2_1=conv2dcustom(filters=3*C,x_input=x1_merged,pool=True,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x2_1=conv2dcustom(filters=3*C,x_input=x2_1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x2_1=conv2dcustom(filters=3*C,x_input=x2_1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)        
+    x2_ident = AveragePooling2D()(x1_ident)
+    x2_merged = merge([x2_1,x2_ident],mode='concat', concat_axis=1)
+
+    #by branching we reduce the #params
+    x3_1 = conv2dcustom(filters=8*C,x_input=x2_merged,pool=True,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x3_1 = conv2dcustom(filters=8*C,x_input=x3_1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x3_1 = conv2dcustom(filters=8*C,x_input=x3_1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)        
+    x3_ident = AveragePooling2D()(x2_ident)
+    x3_merged = merge([x3_1,x3_ident],mode='concat', concat_axis=1)
+
+    x4_1 = conv2dcustom(filters=9*C,x_input=x3_merged,pool=True,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x4_1 = conv2dcustom(filters=9*C,x_input=x4_1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)    
+    x4_1 = conv2dcustom(filters=9*C,x_input=x4_1,w2reg=w2reg,activation=activation,padding=padding,batchNorm=batchNorm)        
+    x4_ident = AveragePooling2D()(x3_ident)
+    x4_merged = merge([x4_1,x4_ident],mode='concat', concat_axis=1)    
+
+    x5_1 = conv2dcustom(filters=9*C,x_input=x4_merged,pool=False,w2reg=w2reg,activation=activation,padding="same",batchNorm=batchNorm)    
+    x5_1 = conv2dcustom(filters=9*C,x_input=x5_1,w2reg=w2reg,activation=activation,padding="valid",batchNorm=batchNorm)    
+    x5_1 = conv2dcustom(filters=9*C,x_input=x5_1,w2reg=w2reg,activation=activation,padding="valid",batchNorm=batchNorm)    
+    
+    # last layer of encoding    
+    flatten_x=Flatten() (x5_1)
+    
+    flatten_x =Dropout(dropout_rate)(flatten_x)
+    
+    
+    output= dense_branch(flatten_x,name='classiflyOut',outsize=numOfOutputs,activation='sigmoid')
+    
+    
+    model = Model(inputs=xin, outputs=output)
+
+    
+    if optimizer=='RMSprop':
+        optimizer = RMSprop(lr)
+    elif optimizer=='Adam':       
+        optimizer = Adam(lr)
+    elif optimizer=='Nadam':       
+        optimizer = Nadam(lr,clipvalue=1.0)        
+    model.compile(loss=loss, optimizer=optimizer)
+
+    return model
+
+
+
+
+def model_classification3(params):
+
+    h=params['h']
+    w=params['w']
+    z=params['z']
+    lr=params['learning_rate']
+    loss=params['loss']
+    C=params['initial_channels']
+    numOfOutputs=params['numOfOutputs']
+    dropout_rate=params['dropout_rate']
+    data_format=params["data_format"]
+    batchNorm=params['batchNorm']
+    w2reg=params['w2reg']
+    if w2reg==True:
+        w2reg=l2(1e-4)
+    initStride=params['initStride']
+    padding=params["padding"]
+    optimizer=params["optimizer"]
+    
+    inputs = Input((z,h, w))
+    conv1=conv2dcustom(filters=C,x_input=inputs,strides=initStride,w2reg=w2reg,activation='leaky',data_format=data_format,padding=padding)    
+    pool1=conv2dcustom(filters=C,x_input=conv1,w2reg=w2reg,pool=True,activation='leaky',padding=padding)    
+
+    conv2=conv2dcustom(filters=2*C,x_input=pool1,w2reg=w2reg,activation='leaky',padding=padding) 
+    conv2=conv2dcustom(filters=2*C,x_input=conv2,w2reg=w2reg,activation='leaky',padding="valid")            
+    pool2=conv2dcustom(filters=2*C,x_input=conv2,w2reg=w2reg,pool=True,activation='leaky',padding="valid")    
+    
+    conv3=conv2dcustom(filters=4*C,x_input=pool2,w2reg=w2reg,activation='leaky',padding=padding)    
+    conv3=conv2dcustom(filters=4*C,x_input=conv3,w2reg=w2reg,activation='leaky',padding="valid")        
+    pool3=conv2dcustom(filters=4*C,x_input=conv3,w2reg=w2reg,pool=True,activation='leaky',padding="valid")    
+
+    conv4=conv2dcustom(filters=8*C,x_input=pool3,w2reg=w2reg,activation='leaky',padding=padding)    
+    conv4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,activation='leaky',padding="valid")        
+    conv4=conv2dcustom(filters=8*C,x_input=conv4,w2reg=w2reg,pool=False,activation='leaky',padding="valid")    
+
+    #conv5=conv2dcustom(filters=16*C,x_input=pool4,w2reg=w2reg,activation='leaky',padding=padding)    
+    #conv5=conv2dcustom(filters=16*C,x_input=conv5,w2reg=w2reg,pool=False,activation='leaky',padding=padding)    
+    
+    # flatten
+    flattenConv5=Flatten()(conv4)
+    
+    # dropout
+    flatten_x =Dropout(dropout_rate)(flattenConv5)
+    
+    
+    #output=Dense(numOfOutputs,activation="sigmoid")(flattenConv5)
+    output= dense_branch(flatten_x,name='classiflyOut',outsize=numOfOutputs,activation='sigmoid')
+    
+    
+    model = Model(inputs=inputs, outputs=output)
+
+    if optimizer=='RMSprop':
+        optimizer = RMSprop(lr)
+    elif optimizer=='Adam':       
+        optimizer = Adam(lr)
+    elif optimizer=='Nadam':       
+        optimizer = Nadam(lr,clipvalue=1.0)      
+        
+    model.compile(loss=loss, optimizer=optimizer)
+
+    
+    return model

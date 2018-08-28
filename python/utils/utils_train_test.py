@@ -266,6 +266,56 @@ def padArrays(X,Y,padSize=(13,14)):
         Y=np.pad(Y,((0,0),(0,0),padSize,padSize),"constant")
     return X,Y    
 
+def computeEvalMetricPositive(Y_gt,Y_pred):
+    nzMaskIndices=np.where(np.any(Y_gt,axis=(1,2,3)))[0]
+    Y_gt=Y_gt[nzMaskIndices]
+    Y_pred=Y_pred[nzMaskIndices]
+    avgMetric,_=computeEvalMetric(Y_gt,Y_pred)
+    return avgMetric
+    
+
+def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="train",path2data=None):
+    path2pickle=os.path.join(path2data,data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        #X=data["X"]
+        Y=data["Y"]
+        #ids=data["ids"]
+    
+    Y_predAllExperiments=[]
+    for experiment in experiments:
+        print("experiment:%s" %experiment)
+        path2experiment=os.path.join(path2allExperiments,experiment)
+        path2predictions=os.path.join(path2experiment,"predictions")
+    
+        # load predictions
+        path2pickle=glob(path2predictions+"/Y_pred_"+data_type+"*.p")[0]
+        data_pred = pickle.load( open( path2pickle, "rb" ) )
+        Y_pred=data_pred["Y"]
+        array_stats(Y_pred)
+        disp_imgs_masks(Y_pred,Y_pred>=0.5)
+        Y_predAllExperiments.append(Y_pred)        
+        
+        if Y is not None:
+            avgEvalMetricAll,_=computeEvalMetric(Y,Y_pred>=0.5)
+            print("average eval metric for all samples: %.3f" %avgEvalMetricAll)
+            avgEvalMetricPositive=computeEvalMetricPositive(Y,Y_pred>=0.5)
+            print("average eval metric for positive samples: %.3f" %avgEvalMetricPositive)
+        print("-"*50)
+    
+    # convert to array
+    Y_predAllExperiments=np.hstack(Y_predAllExperiments)
+    print ('ensemble shape:', Y_predAllExperiments.shape)
+    Y_pred_ensemble=np.mean(Y_predAllExperiments,axis=1)[:,np.newaxis] #>=0.5
+    array_stats(Y_pred_ensemble)
+
+    if Y is not None:
+        avgEvalMetricAll,_=computeEvalMetric(Y,Y_pred_ensemble>=0.5)
+        print("average eval metric for all samples: %.3f" %avgEvalMetricAll)
+        avgEvalMetricPositive=computeEvalMetricPositive(Y,Y_pred_ensemble>=0.5)
+        print("average eval metric for positive samples: %.3f" %avgEvalMetricPositive)
+    
+    return Y_pred_ensemble
 
 def getOutputEnsemble(path2allExperiments,experiments,data_type="train"):
     Y_predAllExperiments=[]
@@ -305,6 +355,14 @@ def storePredictions(configs,Y_pred,suffix=""):
     pickle.dump( data, open( path2pickle, "wb" ) )
     print("predictions stored!")
     return
+
+def storePredictionsWithIds(configs,Y_pred,ids,suffix=""):
+    path2pickle=os.path.join(configs.path2predictions,"Y_pred_"+suffix+"_"+configs.experiment+".p")    
+    data = { "Y": Y_pred,"ids":ids }
+    pickle.dump( data, open( path2pickle, "wb" ) )
+    print("predictions stored!")
+    return
+
 
 def updateRecoredInConfigs(path2Configs,recordName,recordValue,overwrite=False):
     configsDF=pd.read_csv(path2Configs) # load csv
@@ -839,7 +897,7 @@ def computeEvalMetricPerSample(gt, prediction):
     thresholds = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     iou = computeIoUperSample(gt, prediction)
     precisions = [compute_precision_at(iou, th) for th in thresholds]
-    return sum(precisions) / len(precisions)
+    return np.mean(precisions)
     
 
 def compute_precision_at(iou, threshold):

@@ -55,7 +55,9 @@ X,Y,ids_train=utils_train_test.load_data(configs,"train")
 X,Y=utils_train_test.padArrays(X,Y,configs.padSize)
 Y_pred=utils_train_test.getOutputAllFolds(X,configs,binaryMask=False)
 Y_pred=utils_train_test.unpadArray(Y_pred,configs.padSize)
-utils_train_test.storePredictions(configs,Y_pred,"train")
+#utils_train_test.storePredictions(configs,Y_pred,"train")
+utils_train_test.storePredictionsWithIds(configs,Y_pred,ids_train,"train")
+
 
 
 # =============================================================================
@@ -77,7 +79,8 @@ utils_train_test.array_stats(Y_leaderboard)
 # =============================================================================
 # store predictions of Ensemble model for Leaderboard data
 # =============================================================================
-utils_train_test.storePredictions(configs,Y_leaderboard,"test")
+#utils_train_test.storePredictions(configs,Y_leaderboard,"test")
+utils_train_test.storePredictionsWithIds(configs,Y_leaderboard,ids_leaderboard,"test")
 
 # =============================================================================
 # convert outputs to Run Length Dict
