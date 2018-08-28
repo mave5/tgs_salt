@@ -273,6 +273,12 @@ def computeEvalMetricPositive(Y_gt,Y_pred):
     avgMetric,_=computeEvalMetric(Y_gt,Y_pred)
     return avgMetric
     
+def re_arange(ids,ids_pred,Y_pred):
+    Y_pred_rearanged=np.zeros_like(Y_pred)
+    for k0,id0 in enumerate(ids):
+        id_ind=ids_pred.index(id0)
+        Y_pred_rearanged[k0]=Y_pred[id_ind]
+    return Y_pred_rearanged
 
 def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="train",path2data=None):
     path2pickle=os.path.join(path2data,data_type+".p")
@@ -280,7 +286,7 @@ def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="trai
         data = pickle.load( open( path2pickle, "rb" ) )
         #X=data["X"]
         Y=data["Y"]
-        #ids=data["ids"]
+        ids=data["ids"]
     
     Y_predAllExperiments=[]
     for experiment in experiments:
@@ -292,6 +298,10 @@ def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="trai
         path2pickle=glob(path2predictions+"/Y_pred_"+data_type+"*.p")[0]
         data_pred = pickle.load( open( path2pickle, "rb" ) )
         Y_pred=data_pred["Y"]
+        ids_pred=data_pred["ids"]
+        if ids!=ids_pred:
+            Y_pred=re_arange(ids,ids_pred,Y_pred)
+                
         array_stats(Y_pred)
         disp_imgs_masks(Y_pred,Y_pred>=0.5)
         Y_predAllExperiments.append(Y_pred)        
