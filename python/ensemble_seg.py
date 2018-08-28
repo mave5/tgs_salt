@@ -31,7 +31,7 @@ Y_pred_ensemble=utils_train_test.getOutputEnsemble_evalMetric(path2allExperiment
 utils_train_test.storePredictionsEnsemble(path2predictions,Y_pred_ensemble,"train"+experimentsJoin)
 del Y_pred_ensemble
 
-Y_leaderboard=utils_train_test.getOutputEnsemble(path2allExperiments,experiments,data_type="test")    
+Y_leaderboard=utils_train_test.getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="test",path2data="../data/")    
 utils_train_test.storePredictionsEnsemble(path2predictions,Y_leaderboard,"test"+experimentsJoin)
 
 

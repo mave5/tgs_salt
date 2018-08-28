@@ -280,7 +280,7 @@ def re_arange(ids,ids_pred,Y_pred):
         Y_pred_rearanged[k0]=Y_pred[id_ind]
     return Y_pred_rearanged
 
-def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="train",path2data=None):
+def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="train",path2data="../data/"):
     path2pickle=os.path.join(path2data,data_type+".p")
     if os.path.exists(path2pickle):
         data = pickle.load( open( path2pickle, "rb" ) )
