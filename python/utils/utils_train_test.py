@@ -17,6 +17,32 @@ from keras.models import load_model
 # elastic augmentation
 #from scipy.ndimage.filters import gaussian_filter
 
+def separateLargeMasks(X,Y,configs):
+    if configs.nonZeroMasksOnly:
+        sumY=np.sum(Y,axis=(1,2,3))
+        largeMasksInds=np.where(sumY>configs.largeMaskThreshold)
+        #nzMaskIndices=np.where(np.any(Y,axis=(1,2,3)))[0]
+        X=X[largeMasksInds]
+        Y=Y[largeMasksInds]
+        array_stats(X) 
+        array_stats(Y)
+        disp_imgs_masks(X,Y)
+    return X,Y        
+
+def histogramEqualization(X_train=None,X_test=None,histeq=False):
+    # histogram equalization
+    if histeq is True:
+        print('histogram equlization ...')
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        if X_train is not None:
+            for k in range(X_train.shape[0]):
+                X_train[k,:] = clahe.apply(X_train[k,0])
+        if X_test is not None:                
+            for k in range(X_test.shape[0]):
+                X_test[k,:] = clahe.apply(X_test[k,0])        
+    
+    return X_train,X_test    
+        
 
 def rotateData(X,rotationAngle=180):
     n,c,h,w=X.shape
@@ -58,6 +84,28 @@ def elastic_transform_multi_fast(x, y, kwargs, smooth_transformation_fields):
             for k2 in range(y.shape[1]):
                 y_t[k, k2, :] = cv2.remap(y[k, k2, :], x_coords, y_coords, cv2.INTER_CUBIC)
     return x_t.astype('uint8'), y_t.astype('uint8')
+
+
+def elastic_transform_multi_fast_float(x, y, kwargs, smooth_transformation_fields):
+    N = smooth_transformation_fields.shape[0]
+    x_t = np.zeros_like(x)
+    if y is None:
+        y= np.zeros_like(x)
+    y_t = np.zeros_like(y)
+
+    x_grid, y_grid = np.meshgrid(np.arange(x.shape[3]), np.arange(x.shape[2]))
+
+    for k in range(x.shape[0]):
+        if np.random.random() < kwargs['elastic_probability']:
+            #Generate X and Y coordinates from random transformation + grid
+            x_coords = (smooth_transformation_fields[np.random.randint(0, N)] + x_grid).astype('float32')
+            y_coords = (smooth_transformation_fields[np.random.randint(0, N)] + y_grid).astype('float32')
+            
+            for k3 in range(x.shape[1]):
+                x_t[k, k3] = cv2.remap(x[k, k3], x_coords, y_coords, cv2.INTER_CUBIC)
+            for k2 in range(y.shape[1]):
+                y_t[k, k2, :] = cv2.remap(y[k, k2, :], x_coords, y_coords, cv2.INTER_CUBIC)
+    return x_t, y_t
 
 
 def gammaAugmentImage(image,gamma=0.1):
@@ -284,11 +332,11 @@ def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="trai
     path2pickle=os.path.join(path2data,data_type+".p")
     if os.path.exists(path2pickle):
         data = pickle.load( open( path2pickle, "rb" ) )
-        #X=data["X"]
+        X=data["X"]
         Y=data["Y"]
         ids=data["ids"]
     
-    Y_predAllExperiments=[]
+    Y_predAllExperiments=np.zeros_like(Y,"float32")
     for experiment in experiments:
         print("experiment:%s" %experiment)
         path2experiment=os.path.join(path2allExperiments,experiment)
@@ -303,8 +351,8 @@ def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="trai
             Y_pred=re_arange(ids,ids_pred,Y_pred)
                 
         array_stats(Y_pred)
-        disp_imgs_masks(Y_pred,Y_pred>=0.5)
-        Y_predAllExperiments.append(Y_pred)        
+        disp_imgs_masks(X,Y_pred>=0.5)
+        Y_predAllExperiments+=Y_pred/len(experiments)        
         
         if Y is not None:
             avgEvalMetricAll,_=computeEvalMetric(Y,Y_pred>=0.5)
@@ -314,7 +362,7 @@ def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="trai
         print("-"*50)
     
     # convert to array
-    Y_predAllExperiments=np.hstack(Y_predAllExperiments)
+    #Y_predAllExperiments=np.hstack(Y_predAllExperiments)
     print ('ensemble shape:', Y_predAllExperiments.shape)
     Y_pred_ensemble=np.mean(Y_predAllExperiments,axis=1)[:,np.newaxis] #>=0.5
     array_stats(Y_pred_ensemble)
@@ -326,6 +374,82 @@ def getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="trai
         print("average eval metric for positive samples: %.3f" %avgEvalMetricPositive)
     
     return Y_pred_ensemble
+
+
+def multiplyVectorByMatrix(y,Y,threshold=0.5):
+    # Y is N*C*H*W
+    # y is N*1
+    y_bin=y>=threshold
+    for k in range(len(Y)):
+        Y[k]=y_bin[k]*Y[k]
+    return Y
+
+def getOutputEnsembleClassify_evalMetric(path2allExperiments,experiments,data_type="train",path2data="../data/"):
+    path2pickle=os.path.join(path2data,data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        X=data["X"]
+        Y=data["Y"]
+        ids=data["ids"]
+    
+    Y_predAllExperiments=np.zeros_like(X,"float32")
+    y_predAllExperiments=np.zeros((X.shape[0],1),"float32")
+    for experiment in experiments:
+        print("experiment:%s" %experiment)
+        path2experiment=os.path.join(path2allExperiments,experiment)
+        path2predictions=os.path.join(path2experiment,"predictions")
+    
+        # load predictions
+        path2pickle=glob(path2predictions+"/Y_pred_"+data_type+"*.p")[0]
+        data_pred = pickle.load( open( path2pickle, "rb" ) )
+        Y_pred=data_pred["Y"]
+        y_pred=data_pred["y"]
+        ids_pred=data_pred["ids"]
+        
+        if ids!=ids_pred:
+            Y_pred=re_arange(ids,ids_pred,Y_pred)
+            y_pred=re_arange(ids,ids_pred,y_pred)
+                
+        array_stats(Y_pred)
+        array_stats(y_pred)
+        disp_imgs_masks(X,Y_pred>=0.5)
+        Y_predAllExperiments+=Y_pred/len(experiments)        
+        y_predAllExperiments+=y_pred/len(experiments)                
+        
+        if Y is not None:
+            avgEvalMetricAll,_=computeEvalMetric(Y,Y_pred>=0.5)
+            print("average eval metric for all samples: %.3f" %avgEvalMetricAll)
+            avgEvalMetricPositive=computeEvalMetricPositive(Y,Y_pred>=0.5)
+            print("average eval metric for positive samples: %.3f" %avgEvalMetricPositive)
+            # after classification
+            Y_pred=multiplyVectorByMatrix(y_pred,Y_pred)
+            avgEvalMetricAllAfter,_=computeEvalMetric(Y,Y_pred>=0.5)
+            print("average eval metric for all samples after classification: %.3f" %avgEvalMetricAllAfter)
+            
+        print("-"*50)
+    
+    # convert to array
+    print ('Y ensemble shape:', Y_predAllExperiments.shape)
+    print ('y ensemble shape:', y_predAllExperiments.shape)
+    Y_pred_ensemble=np.mean(Y_predAllExperiments,axis=1)[:,np.newaxis] 
+    y_pred_ensemble=np.mean(y_predAllExperiments,axis=1)[:,np.newaxis]
+
+    array_stats(Y_pred_ensemble)
+    array_stats(y_pred_ensemble)
+
+    if Y is not None:
+        avgEvalMetricAll,_=computeEvalMetric(Y,Y_pred_ensemble>=0.5)
+        print("average eval metric for all samples: %.3f" %avgEvalMetricAll)
+        avgEvalMetricPositive=computeEvalMetricPositive(Y,Y_pred_ensemble>=0.5)
+        print("average eval metric for positive samples: %.3f" %avgEvalMetricPositive)
+        
+        # after classification
+        Y_pred_ensemble=multiplyVectorByMatrix(y_pred_ensemble,Y_pred_ensemble)
+        avgEvalMetricAllAfter,_=computeEvalMetric(Y,Y_pred_ensemble>=0.5)
+        print("average eval metric for all samples after classification: %.3f" %avgEvalMetricAllAfter)
+    
+    return Y_pred_ensemble
+
 
 def getOutputEnsemble(path2allExperiments,experiments,data_type="train"):
     Y_predAllExperiments=[]
@@ -369,6 +493,13 @@ def storePredictions(configs,Y_pred,suffix=""):
 def storePredictionsWithIds(configs,Y_pred,ids,suffix=""):
     path2pickle=os.path.join(configs.path2predictions,"Y_pred_"+suffix+"_"+configs.experiment+".p")    
     data = { "Y": Y_pred,"ids":ids }
+    pickle.dump( data, open( path2pickle, "wb" ) )
+    print("predictions stored!")
+    return
+
+def storePredictionsWithIds_classify(configs,Y_pred,y_pred,ids,suffix=""):
+    path2pickle=os.path.join(configs.path2predictions,"Y_pred_"+suffix+"_"+configs.experiment+".p")    
+    data = { "Y": Y_pred,"ids":ids, "y": y_pred }
     pickle.dump( data, open( path2pickle, "wb" ) )
     print("predictions stored!")
     return
@@ -479,6 +610,34 @@ def getOutputAllFolds_classify_prob(X,configs):
     return Y_pred        
 
 
+def getOutputAllFolds_classify_prob_ySoft(X,configs):
+    nFolds=configs.nFolds
+    y_predAllFolds=np.zeros((X.shape[0],1))
+    for foldnm in range(1,nFolds+1):
+        print('fold: %s' %foldnm)
+    
+        y_pred=getYperFold(X,configs,foldnm)    
+        array_stats(y_pred)
+        disp_imgs_masks_labels(X,y_pred>=configs.binaryThreshold)
+        y_predAllFolds+=y_pred/nFolds
+        print('-'*50)
+        
+    # convert to array
+    #y_predAllFolds=np.hstack(y_predAllFolds)
+    print ('ensemble shape:', y_predAllFolds.shape)
+    y_soft=np.mean(y_predAllFolds,axis=1)[:,np.newaxis]
+    y_bin=y_soft>=configs.binaryThreshold
+    array_stats(y_soft)
+
+    # remember that we concatenated mask probability
+    # to the second channel of X_leaderboard.
+    Y_pred_soft=X[:,1][:,np.newaxis]
+    Y_pred_bin=(Y_pred_soft>=configs.maskThreshold).astype("uint8")
+    Y_pred_bin=multiplyVectorByMatrix(y_bin,Y_pred_bin)
+    
+    return Y_pred_bin,Y_pred_soft,y_soft        
+
+
 def getOutputAllFolds_classification(X,configs):
     nFolds=configs.nFolds
     y_predAllFolds=[]
@@ -509,25 +668,23 @@ def getOutputAllFolds_classification(X,configs):
 
 def getOutputAllFolds(X,configs,binaryMask=False):
     nFolds=configs.nFolds
-    Y_predAllFolds=[]
+    Y_predAllFolds=np.zeros_like(X,"float32")
     for foldnm in range(1,nFolds+1):
         print('fold: %s' %foldnm)
     
         Y_pred=getYperFold(X,configs,foldnm)    
         array_stats(Y_pred)
         disp_imgs_masks(X,Y_pred>=configs.maskThreshold)
-        Y_predAllFolds.append(Y_pred)        
+        Y_predAllFolds+=Y_pred/nFolds
         print('-'*50)
         
     # convert to array
-    Y_predAllFolds=np.hstack(Y_predAllFolds)
     print ('ensemble shape:', Y_predAllFolds.shape)
-    Y_leaderboard=np.mean(Y_predAllFolds,axis=1)[:,np.newaxis] #>=0.5
     if binaryMask is True:
-        Y_leaderboard=Y_leaderboard>=configs.maskThreshold    
-    array_stats(Y_leaderboard)
+        Y_predAllFolds=Y_predAllFolds>=configs.maskThreshold    
+    array_stats(Y_predAllFolds)
         
-    return Y_leaderboard        
+    return Y_predAllFolds        
 
 
 def getYperFold(X,configs,foldnm):
@@ -666,13 +823,31 @@ def createModel(configs,showModelSummary=False):
     return model
 
 
-def trainNfolds_classification(X,Y,configs):
+def balance_data(X,y):
+    y1inds=np.where(y==1)[0]
+    y0inds=np.where(y==0)[0]
+    if len(y1inds)>len(y0inds):
+        diffLen=len(y1inds)-len(y0inds)
+        extrasNegSampleInds=np.random.choice(y0inds,diffLen)
+        y=np.concatenate((y,y[extrasNegSampleInds]))
+        X=np.concatenate((X,X[extrasNegSampleInds]))
+    else:
+        diffLen=len(y0inds)-len(y1inds)
+        extrasNegSampleInds=np.random.choice(y1inds,diffLen)
+        y=np.concatenate((y,y[extrasNegSampleInds]))
+        X=np.concatenate((X,X[extrasNegSampleInds]))
+        
+    return X,y
+
+
+def trainNfolds_classification(X,Y,configs,masks=None):
     nFolds=configs.nFolds
     skf = StratifiedShuffleSplit(n_splits=nFolds, test_size=configs.test_size, random_state=321)
     
     # loop over folds
     foldnm=0
     scores_nfolds=[]
+    evalMetric_nfolds=[]
     
     print ('wait ...')
     for train_ind, test_ind in skf.split(X,Y):
@@ -682,7 +857,10 @@ def trainNfolds_classification(X,Y,configs):
         test_ind=list(np.sort(test_ind))
         
         X_train,Y_train=X[train_ind],np.array(Y[train_ind],'uint8')
+        if configs.balanceDataFlag is True:
+            X_train,Y_train=balance_data(X_train,Y_train)
         X_test,Y_test=X[test_ind],np.array(Y[test_ind],'uint8')
+        masks_test=np.array(masks[test_ind],'uint8') # ground truth masks
         
         array_stats(X_train)
         array_stats(Y_train)
@@ -704,12 +882,16 @@ def trainNfolds_classification(X,Y,configs):
         trainingParams['learning_rate']=configs.initialLearningRate
         trainingParams['weightfolder']=weightfolder
         trainingParams['path2weights']=path2weights
+        trainingParams['maskThreshold']=configs.maskThreshold
+        trainingParams['binaryThreshold']=configs.binaryThreshold
 
         # create model        
         model=createModel(configs,configs.showModelSummary)
         
         data=X_train,Y_train,X_test,Y_test
-        train_test_classification(data,trainingParams,model)
+        #train_test_classification(data,trainingParams,model)
+        #train_test_classificationEvalMetric(data,trainingParams,model)
+        train_test_classificationElastic(data,trainingParams,model)
         
         # loading best weights from training session
         if  os.path.exists(path2weights):
@@ -723,10 +905,19 @@ def trainNfolds_classification(X,Y,configs):
         print ('-' *30)
         # store scores for all folds
         scores_nfolds.append(score_test)
-    
+        
+        # compute evaluation metrics
+        y_test_pred=model.predict(preprocess(X_test,configs.normalizationParams))
+        Y_test_pred=multiplyVectorByMatrix(y_test_pred>=configs.binaryThreshold,X_test[:,1][:,np.newaxis])
+        evalMetricPerFold,_=computeEvalMetric(masks_test,Y_test_pred>=configs.maskThreshold)
+        evalMetric_nfolds.append(evalMetricPerFold)
+        print("eval metric for fold %s: %.3f" %(foldnm,evalMetricPerFold))
+        print("-"*50)    
+        
     print ('average score for %s folds is %s' %(nFolds,np.mean(scores_nfolds)))
+    print ('average eval metric for %s folds is %.3f' %(nFolds,np.mean(evalMetric_nfolds)))
     print("-"*50)
-    return scores_nfolds
+    return evalMetric_nfolds
 
 
 
@@ -1078,16 +1269,15 @@ def train_test_classification(data,params_train,model):
         previous_score = 1e6
     patience = 0
     
-    # augmentation data generator
-    train_generator,steps_per_epoch=data_generator_classification(X_train,Y_train,batch_size,augmentationParams)
-    
     
     for epoch in range(params_train['nbepoch']):
     
         print ('epoch: %s / %s,  Current Learning Rate: %.1e' %(epoch,nbepoch,model.optimizer.lr.get_value()))
-        #seed = np.random.randint(0, 999999)
-    
+
         if augmentation:
+            # augmentation data generator
+            train_generator,steps_per_epoch=data_generator_classification(X_train,Y_train,batch_size,augmentationParams)
+            
             hist=model.fit_generator(train_generator,steps_per_epoch=steps_per_epoch,epochs=1, verbose=0)
         else:
             hist=model.fit(preprocess(X_train,normalizationParams), Y_train, batch_size=batch_size,epochs=1, verbose=0)
@@ -1151,6 +1341,275 @@ def train_test_classification(data,params_train,model):
     train_status='completed!'
     return train_status    
 
+
+def train_test_classificationElastic(data,params_train,model):
+    X_train,Y_train,X_test,Y_test=data
+    foldnm=params_train['foldnm']  
+    pre_train=params_train['pre_train'] 
+    batch_size=params_train['batch_size'] 
+    augmentation=params_train['augmentation'] 
+    weightfolder=params_train['weightfolder'] 
+    path2weights=params_train['path2weights'] 
+    normalizationParams=params_train["normalizationParams"]
+    augmentationParams=params_train["augmentationParams"]
+    nbepoch=params_train["nbepoch"]
+    elastic_arg=params_train["elastic_arg"]
+    
+    path2model=os.path.join(weightfolder,"model.hdf5")    
+    
+    print("-"*50)
+    print('batch_size: %s, Augmentation: %s' %(batch_size,augmentation))
+    print ('fold %s training in progress ...' %foldnm)
+    print("-"*50)
+    
+    # load last weights
+    if pre_train== True:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print ('previous weights loaded!')
+        else:
+            raise IOError('weights does not exist!!!')
+    else:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print (path2weights)
+            print ('previous weights loaded!')
+            train_status='previous weights'
+            return train_status
+    
+    # path to csv file to save scores
+    path2scorescsv = os.path.join(weightfolder,'scores.csv')
+    first_row = 'train,test'
+    with open(path2scorescsv, 'w+') as f:
+        f.write(first_row + '\n')
+           
+    # initialize     
+    start_time=time.time()
+    scores_test=[]
+    scores_train=[]
+    if params_train['loss']=='dice': 
+        best_score = 0
+        previous_score = 0
+    else:
+        best_score = 1e6
+        previous_score = 1e6
+    patience = 0
+    
+    
+    
+    # elstic transformation
+    print("elastic transformation ... !")
+    smooth_transformation_fields = generate_smooth_transformation_fields(X_train.shape[2:],elastic_arg)
+    
+    for epoch in range(params_train['nbepoch']):
+    
+        print ('epoch: %s / %s,  Current Learning Rate: %.1e' %(epoch,nbepoch,model.optimizer.lr.get_value()))
+        # perform elastic transformation
+        if params_train["elasticTransform"] is True:
+            X_train_t,_=elastic_transform_multi_fast_float(X_train,None,elastic_arg,smooth_transformation_fields)
+        else:
+            X_train_t=X_train.copy()
+
+        if augmentation:
+            # augmentation data generator
+            train_generator,steps_per_epoch=data_generator_classification(X_train_t,Y_train,batch_size,augmentationParams)
+            
+            hist=model.fit_generator(train_generator,steps_per_epoch=steps_per_epoch,epochs=1, verbose=0)
+        else:
+            hist=model.fit(preprocess(X_train,normalizationParams), Y_train, batch_size=batch_size,epochs=1, verbose=0)
+            
+        # evaluate on test and train data
+        score_test=model.evaluate(preprocess(X_test,normalizationParams),Y_test,verbose=0)
+        score_train=np.mean(hist.history['loss'])
+       
+        print ('score_train: %s, score_test: %s' %(score_train,score_test))
+        scores_test=np.append(scores_test,score_test)
+        scores_train=np.append(scores_train,score_train)    
+
+        # check for improvement    
+        if (score_test<=best_score):
+            print ("!!!!!!!!!!!!!!!!!!!!!!!!!!! viva, improvement!!!!!!!!!!!!!!!!!!!!!!!!!!!") 
+            best_score = score_test
+            patience = 0
+            model.save_weights(path2weights)  
+            model.save(path2model)
+            
+        # learning rate schedule
+        if score_test>previous_score:
+            #print "Incrementing Patience."
+            patience += 1
+
+        # learning rate schedule                
+        if patience == params_train['max_patience']:
+            params_train['learning_rate'] = params_train['learning_rate']/2
+            print ("Upating Current Learning Rate to: ", params_train['learning_rate'])
+            model.optimizer.lr.set_value(params_train['learning_rate'])
+            print ("Loading the best weights again. best_score: ",best_score)
+            model.load_weights(path2weights)
+            patience = 0
+        
+        # save current test score
+        previous_score = score_test    
+        
+        # store scores into csv file
+        with open(path2scorescsv, 'a') as f:
+            string = str([score_train,score_test])
+            f.write(string + '\n')
+           
+    
+    print ('model was trained!')
+    elapsed_time=(time.time()-start_time)/60
+    print ('elapsed time: %d  mins' %elapsed_time)      
+
+    # train test progress plots
+    plt.figure(figsize=(10,10))
+    plt.plot(scores_test)
+    plt.plot(scores_train)
+    plt.title('train-validation progress',fontsize=20)
+    plt.legend(('test','train'),fontsize=20)
+    plt.xlabel('epochs',fontsize=20)
+    plt.ylabel('loss',fontsize=20)
+    plt.grid(True)
+    plt.savefig(weightfolder+'/train_val_progress.png')
+    #plt.show()
+    
+    print ('training completed!')
+    train_status='completed!'
+    return train_status    
+
+
+
+def train_test_classificationEvalMetric(data,params_train,model):
+    X_train,Y_train,X_test,Y_test=data
+    foldnm=params_train['foldnm']  
+    pre_train=params_train['pre_train'] 
+    batch_size=params_train['batch_size'] 
+    augmentation=params_train['augmentation'] 
+    weightfolder=params_train['weightfolder'] 
+    path2weights=params_train['path2weights'] 
+    normalizationParams=params_train["normalizationParams"]
+    augmentationParams=params_train["augmentationParams"]
+    nbepoch=params_train["nbepoch"]
+    binaryThreshold=params_train["binaryThreshold"]
+    maskThreshold=params_train["maskThreshold"]
+    
+    path2model=os.path.join(weightfolder,"model.hdf5")    
+    
+    print("-"*50)
+    print('batch_size: %s, Augmentation: %s' %(batch_size,augmentation))
+    print ('fold %s training in progress ...' %foldnm)
+    print("-"*50)
+    
+    # load last weights
+    if pre_train== True:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print ('previous weights loaded!')
+        else:
+            raise IOError('weights does not exist!!!')
+    else:
+        if  os.path.exists(path2weights):
+            model.load_weights(path2weights)
+            print (path2weights)
+            print ('previous weights loaded!')
+            train_status='previous weights'
+            return train_status
+    
+    # path to csv file to save scores
+    path2scorescsv = os.path.join(weightfolder,'scores.csv')
+    first_row = 'train,test'
+    with open(path2scorescsv, 'w+') as f:
+        f.write(first_row + '\n')
+           
+    # initialize     
+    start_time=time.time()
+    scores_test=[]
+    scores_train=[]
+    if params_train['loss']=='dice': 
+        best_score = 0
+        previous_score = 0
+    else:
+        best_score = 1e6
+        previous_score = 1e6
+    patience = 0
+    
+    
+    for epoch in range(params_train['nbepoch']):
+    
+        print ('epoch: %s / %s,  Current Learning Rate: %.1e' %(epoch,nbepoch,model.optimizer.lr.get_value()))
+    
+        if augmentation:
+            # augmentation data generator
+            train_generator,steps_per_epoch=data_generator_classification(X_train,Y_train,batch_size,augmentationParams)
+            hist=model.fit_generator(train_generator,steps_per_epoch=steps_per_epoch,epochs=1, verbose=0)
+        else:
+            hist=model.fit(preprocess(X_train,normalizationParams), Y_train, batch_size=batch_size,epochs=1, verbose=0)
+            
+        # evaluate on test and train data
+        score_test=model.evaluate(preprocess(X_test,normalizationParams),Y_test,verbose=0)
+        score_train=np.mean(hist.history['loss'])
+
+        # compute evaluation metrics
+        y_test_pred=model.predict(preprocess(X_test,normalizationParams))
+        Y_test_pred=multiplyVectorByMatrix(y_test_pred>=binaryThreshold,X_test[:,1][:,np.newaxis])
+        evalMetric,_=computeEvalMetric(Y_test,Y_test_pred>=maskThreshold)
+        print("eval metric: %.3f" %evalMetric)
+        
+       
+        print ('score_train: %s, score_test: %s' %(score_train,score_test))
+        scores_test=np.append(scores_test,score_test)
+        scores_train=np.append(scores_train,score_train)    
+
+        # check for improvement    
+        if (score_test<=best_score):
+            print ("!!!!!!!!!!!!!!!!!!!!!!!!!!! viva, improvement!!!!!!!!!!!!!!!!!!!!!!!!!!!") 
+            best_score = score_test
+            patience = 0
+            model.save_weights(path2weights)  
+            model.save(path2model)
+            
+        # learning rate schedule
+        if score_test>previous_score:
+            #print "Incrementing Patience."
+            patience += 1
+
+        # learning rate schedule                
+        if patience == params_train['max_patience']:
+            params_train['learning_rate'] = params_train['learning_rate']/2
+            print ("Upating Current Learning Rate to: ", params_train['learning_rate'])
+            model.optimizer.lr.set_value(params_train['learning_rate'])
+            print ("Loading the best weights again. best_score: ",best_score)
+            model.load_weights(path2weights)
+            patience = 0
+        
+        # save current test score
+        previous_score = score_test    
+        
+        # store scores into csv file
+        with open(path2scorescsv, 'a') as f:
+            string = str([score_train,score_test])
+            f.write(string + '\n')
+           
+    
+    print ('model was trained!')
+    elapsed_time=(time.time()-start_time)/60
+    print ('elapsed time: %d  mins' %elapsed_time)      
+
+    # train test progress plots
+    plt.figure(figsize=(10,10))
+    plt.plot(scores_test)
+    plt.plot(scores_train)
+    plt.title('train-validation progress',fontsize=20)
+    plt.legend(('test','train'),fontsize=20)
+    plt.xlabel('epochs',fontsize=20)
+    plt.ylabel('loss',fontsize=20)
+    plt.grid(True)
+    plt.savefig(weightfolder+'/train_val_progress.png')
+    #plt.show()
+    
+    print ('training completed!')
+    train_status='completed!'
+    return train_status    
 
 
 # train test model
@@ -1415,14 +1874,14 @@ def train_test_evalMetric(data,params_train,model):
     train_status='completed!'
     return train_status    
 
-def overlay_contour(img,mask):
+def overlay_contour(img,mask,color=(0,255,0)):
     mask=np.array(mask,"uint8")
     im2, contours, hierarchy = cv2.findContours(mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(img, contours, -1, (0,255,0), 3)
+    cv2.drawContours(img, contours, -1, color, 3)
     return img   
 
 
-def disp_imgs_2masks_labels(X,Y_pred,y,r=2,c=3):
+def disp_imgs_2masks_labels(X,Y2,y,y_pred,r=2,c=3):
     assert len(X)==len(y)        
     n=r*c
     plt.figure(figsize=(12,8))
@@ -1430,14 +1889,16 @@ def disp_imgs_2masks_labels(X,Y_pred,y,r=2,c=3):
     for k,ind in enumerate(indices):
         img=X[ind,0]
         mask=X[ind,1]>=0.5
-        mask2=Y_pred[ind,0]>=0.5
-        img=overlay_contour(img,mask)    
-        img=overlay_contour(img,mask2)    
+        mask2=Y2[ind,0]>=0.5
+        img=overlay_contour(img,mask,(255,0,255))    
+        img=overlay_contour(img,mask2,(0,255,0))# gt    
         h,w=img.shape
-        label=y[ind]
+        text1=y_pred[ind]
+        text2=y[ind]
         plt.subplot(r,c,k+1)
-        plt.imshow(img,cmap="gray");        
-        plt.text(5,h-5,label,fontsize=12)
+        plt.imshow(img);        
+        plt.text(5,h-5,text1,fontsize=12)
+        plt.text(50,h-5,text2,fontsize=12)
         plt.title(ind)    
     #plt.show()
     plt.draw()	
@@ -1515,6 +1976,43 @@ def load_data_classify_prob_bin(configs,data_type="train"):
     
     return X,y,ids
 
+def load_data_classify_prob_largeMaskThreshold(configs,data_type="train"):
+    
+    # loading images and masks
+    path2pickle=os.path.join(configs.path2data,data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        X=data["X"]
+        X=X.astype("float32")/255.
+        Y=data["Y"]
+        ids=data["ids"]
+    else:
+        raise IOError(path2pickle+" does not exist!")
+
+    # loading predictions
+    path2pickle=glob(configs.path2data+"Y_pred_"+data_type+"*.p")[0]
+    baseName=os.path.basename(path2pickle)
+    lenOfPrefix=len("Y_pred_"+data_type)
+    seg_model_version=baseName[lenOfPrefix+1:-2]# path2pickle.split("_")[3][:-2] # get seg model version
+    configs.seg_model_version=seg_model_version # store model version
+    #path2pickle=os.path.join(configs.path2data,"Y_pred_"+data_type+".p")
+    if os.path.exists(path2pickle):
+        data = pickle.load( open( path2pickle, "rb" ) )
+        Y_pred=data["Y"]
+        #Y_pred=np.array(Y_pred*255,"uint8") # same range as images
+    else:
+        raise IOError(path2pickle+" does not exist!")
+
+    # concat images and predictions
+    X=np.concatenate((X,Y_pred),axis=1)
+    
+    # conver masks to labels
+    sumY=np.sum(Y,axis=(1,2,3))
+    y=(sumY>configs.largeMaskThreshold)
+    
+    
+    return X,y,ids,Y
+
 
 def load_data_classify_prob(configs,data_type="train"):
     
@@ -1549,7 +2047,7 @@ def load_data_classify_prob(configs,data_type="train"):
     # conver masks to labels
     y=np.any(Y,axis=(1,2,3))
     
-    return X,y,ids
+    return X,y,ids,Y
     
 
 def load_data_classification(configs,data_type="train"):

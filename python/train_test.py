@@ -17,6 +17,7 @@ configs.showModelSummary=True
 # load data    
 # =============================================================================
 X,Y,ids_train=utils_train_test.load_data(configs,"train")
+X,_=utils_train_test.histogramEqualization(X,None,configs.histeq)
 X,Y=utils_train_test.padArrays(X,Y,configs.padSize)
 #X,Y=utils_train_test.data_resize(X,Y,configs.img_height,configs.img_width)
 utils_train_test.array_stats(X)
@@ -27,14 +28,7 @@ utils_train_test.disp_imgs_masks(X,Y)
 # =============================================================================
 # pick nonzero images and masks
 # =============================================================================
-if configs.nonZeroMasksOnly:
-    nzMaskIndices=np.where(np.any(Y,axis=(1,2,3)))[0]
-    X=X[nzMaskIndices]
-    Y=Y[nzMaskIndices]
-    utils_train_test.array_stats(X) 
-    utils_train_test.array_stats(Y)
-    utils_train_test.disp_imgs_masks(X,Y)
-
+X,Y=utils_train_test.separateLargeMasks(X,Y,configs)
     
 # =============================================================================
 # train for n-Folds
@@ -52,6 +46,7 @@ utils_train_test.updateRecoredInConfigs(configs.path2configs,"avgMetric",np.mean
 # Obtain and store predictions of Ensemble model for train data
 # =============================================================================
 X,Y,ids_train=utils_train_test.load_data(configs,"train")
+X,_=utils_train_test.histogramEqualization(X,None,configs.histeq)
 X,Y=utils_train_test.padArrays(X,Y,configs.padSize)
 Y_pred=utils_train_test.getOutputAllFolds(X,configs,binaryMask=False)
 Y_pred=utils_train_test.unpadArray(Y_pred,configs.padSize)
@@ -64,6 +59,8 @@ utils_train_test.storePredictionsWithIds(configs,Y_pred,ids_train,"train")
 # leaderboard data
 # =============================================================================
 X_leaderboard,_,ids_leaderboard=utils_train_test.load_data(configs,"test")
+X_leaderboard,_=utils_train_test.histogramEqualization(X_leaderboard,None,configs.histeq)
+
 X_leaderboard,_=utils_train_test.padArrays(X_leaderboard,None,configs.padSize)
 #X_leaderboard,_=utils_train_test.data_resize(X_leaderboard,None,configs.img_height,configs.img_width)
 utils_train_test.array_stats(X_leaderboard)

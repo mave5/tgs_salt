@@ -58,6 +58,7 @@ def getAnExperiment(path2allExperiments,agileIterationNum,projectStage):
     
     # get a list of all existing experiments    
     listOfExperiments=os.listdir(path2allExperiments)
+    #listOfExperiments.sort(key=os.path.getmtime)
     sort_nicely(listOfExperiments)
     
     # a dict to collect experiments and messages

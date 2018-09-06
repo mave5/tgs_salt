@@ -21,7 +21,7 @@ img_height,img_width,img_channel=101,101,1 # image dimensions
 numOfInputConvFilters=32 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
-test_size=0.2 # portion of data to be used for local test during training
+test_size=0.1 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
 agileIterationNum="6" # iteration number
@@ -29,8 +29,10 @@ seed = 2018 # fix random seed for reproducibility
 initialLearningRate=1e-4
 nonZeroMasksOnly=True
 showModelSummary=False
-numOfEpochs=500
+numOfEpochs=600
 maskThreshold=0.5
+largeMaskThreshold=1
+histeq=False
 #padSize=(13,14) # to make image size 128*128
 padSize=(0,0) # no zero padding
 np.random.seed(seed)
@@ -51,6 +53,8 @@ pre_settings["numOfEpochs"]=numOfEpochs
 pre_settings["showModelSummary"]=showModelSummary
 pre_settings["maskThreshold"]=maskThreshold
 pre_settings["padSize"]=padSize
+pre_settings["largeMaskThreshold"]=largeMaskThreshold
+pre_settings["histeq"]=histeq
 pre_settings["c"]="continue"
 pre_settings["e"]="Exit!"
 
@@ -187,7 +191,7 @@ print('-'*50)
 # =============================================================================
 # histogram equalization
 if configsDF is None:
-    histeq=False
+    pass
 else:
     histeq=configsDF.loc[configsDF['Name']=='histeq','Value'].tolist()[0]        
     if histeq=='True':
@@ -249,7 +253,7 @@ else:
 #==============================================================================
 # Elastic Parameters
 #==============================================================================
-elastic_arg = {'elastic_probability': 0.1,
+elastic_arg = {'elastic_probability': 0.2,
                'nr_of_random_transformations': 1000,  # x and y transformation are separate so total nr is N*N
                'alpha': 2.0,
                'sigma': 0.1
@@ -286,6 +290,7 @@ if configsDF is None:
             #'loss': 'categorical_crossentropy',
             #'loss': 'binary_crossentropy',
             "loss": "custom",
+            #"loss": "customCategorical",
             #"loss": "averagePrecision",
             #"loss": "iou_loss",
             'nbepoch': numOfEpochs,

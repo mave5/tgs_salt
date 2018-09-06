@@ -23,14 +23,14 @@ if not os.path.exists(path2predictions):
 # =============================================================================
 # list of experiments to be ensembled
 # =============================================================================
-experiments=["0.3.7","0.3.11","0.5.3","0.6.10"]
+experiments=["0.6.1","0.6.2","0.3.15"]
 experimentsJoin="".join("_"+e for e in experiments)
 
-Y_pred_ensemble=utils_train_test.getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="train",path2data=path2data)    
+Y_pred_ensemble=utils_train_test.getOutputEnsembleClassify_evalMetric(path2allExperiments,experiments,data_type="train",path2data=path2data)    
 utils_train_test.storePredictionsEnsemble(path2predictions,Y_pred_ensemble,"train"+experimentsJoin)
 del Y_pred_ensemble
 
-Y_leaderboard=utils_train_test.getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="test",path2data=path2data)    
+Y_leaderboard=utils_train_test.getOutputEnsembleClassify_evalMetric(path2allExperiments,experiments,data_type="test",path2data=path2data)    
 utils_train_test.storePredictionsEnsemble(path2predictions,Y_leaderboard,"test"+experimentsJoin)
 
 

@@ -20,7 +20,7 @@ img_height,img_width,img_channel=101,101,2 # image dimensions
 numOfInputConvFilters=32 # number of input conv filters
 pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
-test_size=0.2 # portion of data to be used for local test during training
+test_size=0.1 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
 agileIterationNum="6" # iteration number
@@ -30,7 +30,9 @@ nonZeroMasksOnly=False # only for segmentation
 binaryThreshold=0.5
 maskThreshold=0.5
 showModelSummary=False
-nbepoch=300
+nbepoch=500
+largeMaskThreshold=1
+balanceDataFlag=True
 np.random.seed(seed)
 
 
@@ -48,6 +50,8 @@ pre_settings["nonZeroMasksOnly"]=nonZeroMasksOnly
 pre_settings["showModelSummary"]=showModelSummary
 pre_settings["binaryThreshold"]=binaryThreshold
 pre_settings["maskThreshold"]=maskThreshold
+pre_settings["largeMaskThreshold"]=largeMaskThreshold
+pre_settings["balanceDataFlag"]=balanceDataFlag
 pre_settings["c"]="continue"
 pre_settings["e"]="Exit!"
 
@@ -224,9 +228,9 @@ pp_func=getattr(thismodule, "preprocessing_function")
 if configsDF is None:
     augmentationParams = dict(samplewise_center=False,
                               samplewise_std_normalization=False,
-                         rotation_range=10,
-                         width_shift_range=0.1,
-                         height_shift_range=0.1,
+                         rotation_range=5,
+                         width_shift_range=0.05,
+                         height_shift_range=0.05,
                          zoom_range=0.05,
                          shear_range=0.1,
                          horizontal_flip=True,
@@ -243,7 +247,7 @@ else:
 #==============================================================================
 # Elastic Parameters
 #==============================================================================
-elastic_arg = {'elastic_probability': 0.5,
+elastic_arg = {'elastic_probability': 0.1,
                'nr_of_random_transformations': 1000,  # x and y transformation are separate so total nr is N*N
                'alpha': 2.0,
                'sigma': 0.1
@@ -300,6 +304,9 @@ if configsDF is None:
             "augmentation": True,
             "padding": "same",
             "activation": "leaky",
+            "binaryThreshold": binaryThreshold,
+            "maskThreshold": maskThreshold,
+            "elasticTransform": True,
             }
 else:
     trainingParams=configsDF.loc[configsDF['Name']=='trainingParams','Value'].tolist()[0]
