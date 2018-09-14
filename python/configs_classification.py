@@ -30,7 +30,7 @@ nonZeroMasksOnly=False # only for segmentation
 binaryThreshold=0.5
 maskThreshold=0.5
 showModelSummary=False
-nbepoch=500
+nbepoch=300
 largeMaskThreshold=1
 balanceDataFlag=True
 np.random.seed(seed)
@@ -247,7 +247,7 @@ else:
 #==============================================================================
 # Elastic Parameters
 #==============================================================================
-elastic_arg = {'elastic_probability': 0.1,
+elastic_arg = {'elastic_probability': 0.0,
                'nr_of_random_transformations': 1000,  # x and y transformation are separate so total nr is N*N
                'alpha': 2.0,
                'sigma': 0.1
@@ -306,7 +306,7 @@ if configsDF is None:
             "activation": "leaky",
             "binaryThreshold": binaryThreshold,
             "maskThreshold": maskThreshold,
-            "elasticTransform": True,
+            "elasticTransform": False,
             }
 else:
     trainingParams=configsDF.loc[configsDF['Name']=='trainingParams','Value'].tolist()[0]

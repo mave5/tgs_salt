@@ -1943,6 +1943,30 @@ def array_stats(X):
     print ('min: {}, max: {}, avg: {:.3}, std:{:.3}'.format( np.min(X),np.max(X),np.mean(X),np.std(X)))
 
 
+from utils import utils_config
+import os
+
+def load_data_sudoAnnotations(configs,data_type="test"):
+    path2allExperiments=configs.path2allExperiments
+    agileIterationNum=configs.agileIterationNum
+    projectStage=configs.projectStage
+    maskThreshold=configs.maskThreshold
+    binaryThreshold=configs.binaryThreshold
+    
+    print("pick an experiment to be used as sudo-annotations:")
+    experimentSudo=utils_config.getAnExperiment(path2allExperiments,agileIterationNum,projectStage)
+    path2experimentSudo=os.path.join(path2allExperiments,experimentSudo,"predictions")
+    path2pickle=glob(path2experimentSudo+"/Y_pred_"+data_type+"*.p")[0]
+    data = pickle.load( open( path2pickle, "rb" ) )
+    Y_pred=data["Y"]>= maskThreshold
+    y_pred=data["y"]
+    ids=data["ids"]
+    Y_pred=multiplyVectorByMatrix(y_pred,Y_pred,binaryThreshold)
+    
+    return Y_pred,ids
+
+    
+
 def load_data_classify_prob_bin(configs,data_type="train"):
     
     # loading images and masks
