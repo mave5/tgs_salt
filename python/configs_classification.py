@@ -18,14 +18,14 @@ import json
 # =============================================================================
 img_height,img_width,img_channel=101,101,2 # image dimensions
 numOfInputConvFilters=32 # number of input conv filters
-pre_train=False # use previous weights or start from scratch
+pre_train=True # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.1 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
 agileIterationNum="6" # iteration number
 seed = 2018 # fix random seed for reproducibility
-initialLearningRate=1e-4
+initialLearningRate=5e-5
 nonZeroMasksOnly=False # only for segmentation
 binaryThreshold=0.5
 maskThreshold=0.5
@@ -229,8 +229,8 @@ if configsDF is None:
     augmentationParams = dict(samplewise_center=False,
                               samplewise_std_normalization=False,
                          rotation_range=5,
-                         width_shift_range=0.05,
-                         height_shift_range=0.05,
+                         width_shift_range=0.1,
+                         height_shift_range=0.1,
                          zoom_range=0.05,
                          shear_range=0.1,
                          horizontal_flip=True,

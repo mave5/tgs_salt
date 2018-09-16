@@ -1119,26 +1119,44 @@ def computeIoUperSample(x,y):
 
 # calcualte dice
 def calc_dice(X,Y,d=0):
-    N=X.shape[d]    
+    N=X.shape[d]
+
+    if X.ndim==3:
+        X=X[:,np.newaxis]
+    if Y.ndim==3:
+        Y=Y[:,np.newaxis]
+        
     # intialize dice vector
     dice=np.zeros([N,1])
+    smooth=1e-9
 
     for k in range(N):
-        x=X[k,0] >.5 # convert to logical
-        y =Y[k,0]>.5 # convert to logical
+        x=X[k,0] >=.5 # convert to logical
+        y =Y[k,0]>=.5 # convert to logical
 
         # number of ones for intersection and union
-        intersectXY=np.sum((x&y==1))
-        unionXY=np.sum(x)+np.sum(y)
+        intersectXY=np.sum((x&y==1))+smooth
+        unionXY=np.sum(x)+np.sum(y)+2*smooth
 
-        if unionXY!=0:
-            dice[k]=2* intersectXY/(unionXY*1.0)
-            #print 'dice is: %0.2f' %dice[k]
-        else:
-            dice[k]=1
-            #print 'dice is: %0.2f' % dice[k]
-        #print 'processing %d, dice= %0.2f' %(k,dice[k])
+        dice[k]=(2* intersectXY)/(unionXY)
+
     return np.mean(dice),dice    
+
+def calc_dicePerSample(x,y):
+    smooth=1e-5
+
+    if x.dtype is not "bool":
+        x=x>=0.5
+    if y.dtype is not "bool":
+        y=y>=0.5
+        
+    intersectXY=np.sum((x&y==1))
+    unionXY=np.sum(x)+np.sum(y)
+
+    dice=2* (intersectXY+smooth)/(unionXY+smooth)
+
+    return dice
+
 
 def preprocess(X,params):    
     # type of normalization
