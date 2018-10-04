@@ -37,3 +37,4 @@ class customLoss:
             loss+=y_true[:,:,cls]*K.log(y_pred[:,:,cls])
             
         return -loss
+

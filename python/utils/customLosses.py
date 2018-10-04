@@ -1,4 +1,4 @@
-
+from keras import losses
 
 from keras import backend as K
 _EPSILON = K.epsilon()
@@ -37,3 +37,87 @@ class customCategoricalCrossEntropy:
             loss+=y_true[:,:,cls]*K.log(y_pred[:,:,cls])
             
         return -loss
+
+def focal_loss(y_true, y_pred):
+    y_pred = K.clip(y_pred, _EPSILON, 1.0-_EPSILON)
+    gamma=2
+    out=-y_true*(1-y_pred)**gamma*K.log(y_pred)-(1-y_true)*K.log(1-y_pred)*y_pred**gamma
+    
+    return out #K.mean(out,axis=(0,1))
+
+
+def iou_tensor(y_true, y_pred):
+    y_pred = K.clip(y_pred, _EPSILON, 1.0-_EPSILON)
+    smooth=_EPSILON
+    y_true_f = K.batch_flatten(y_true)
+    y_pred_f = K.batch_flatten(y_pred)
+    
+    intersection = K.sum(y_true_f * y_pred_f, axis=1, keepdims=True)  
+    union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) -intersection
+    iou=(intersection+smooth) / (union+smooth)
+    return iou
+
+def compute_precision_at_tensor(iou, threshold):
+    tp = iou >= threshold
+    fp= iou < threshold
+    fn= iou < threshold
+    return (tp+_EPSILON) / (tp + fp + fn+_EPSILON)
+
+def computePrecision_tensor(gt, prediction):
+    thresholds = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    thresholds=K.constant(thresholds)
+    iou = iou_tensor(gt, prediction)
+    precisions=0.0
+    for th in thresholds:
+        prc=compute_precision_at_tensor(iou, th)
+        precisions+=prc
+    return precisions / K.eval(thresholds.shape[0])
+
+
+def averagePrecision_loss(y_true, y_pred):
+    loss=-computePrecision_tensor(y_true, y_pred)
+    return K.mean(loss)
+
+def loss_combined(y_true,y_pred):
+    loss=losses.binary_crossentropy(y_true,y_pred)-K.log(jacard_coef(y_true,y_pred))
+    return loss
+
+def jacard_coef(y_true, y_pred):
+    y_pred = K.clip(y_pred, _EPSILON, 1.0-_EPSILON)
+
+    smooth=_EPSILON
+    y_true_f = K.batch_flatten(y_true)
+    y_pred_f = K.batch_flatten(y_pred)
+    #print K.dtype(y_true_f),K.dtype(y_pred_f)
+
+    intersection = K.sum(y_true_f * y_pred_f, axis=1, keepdims=True) 
+
+    union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) -intersection+ smooth
+
+    jaccard=K.mean((intersection+smooth) / union)
+    return jaccard
+
+
+def intersectionOverUnion(y_true, y_pred):
+    smooth=_EPSILON
+    y_true_f = K.batch_flatten(y_true)
+    y_pred_f = K.batch_flatten(y_pred)
+    intersection = K.sum(y_true_f * y_pred_f, axis=1, keepdims=True) 
+    union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) - intersection
+    return K.mean((intersection+ smooth) / (union+ smooth))
+
+def iou_loss(y_true, y_pred):
+    loss=1-jacard_coef(y_true,y_pred)
+    return loss
+
+def dice_coef(y_true, y_pred):
+    smooth=1
+    y_true_f = K.batch_flatten(y_true)
+    y_pred_f = K.batch_flatten(y_pred)
+    intersection = 2. * K.sum(y_true_f * y_pred_f, axis=1, keepdims=True) + smooth
+    union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) + smooth
+    return K.mean(intersection / union)
+
+
+def dice_coef_loss(y_true, y_pred):
+    return -dice_coef(y_true, y_pred)

@@ -4,6 +4,7 @@ from utils import utils_train_test
 import numpy as np
 
 
+
 #%% model summary
 configs.showModelSummary=True
 
@@ -15,6 +16,7 @@ X,y,ids_train,masks=utils_train_test.load_data_classify_prob_largeMaskThreshold(
 utils_train_test.array_stats(X)
 utils_train_test.array_stats(y)
 utils_train_test.disp_imgs_masks_labels(X,y)
+
 
 # =============================================================================
 # train for n-Folds
@@ -53,7 +55,7 @@ utils_train_test.disp_imgs_2masks_labels(X[errorInds],masks[errorInds],y[errorIn
 # =============================================================================
 # leaderboard data
 # =============================================================================
-X_leaderboard,_,ids_leaderboard,_=utils_train_test.load_data_classify_prob(configs,"test")
+X_leaderboard,_,ids_leaderboard,_=utils_train_test.load_data_classify_prob_largeMaskThreshold(configs,"test")
 utils_train_test.array_stats(X_leaderboard)
 
 

@@ -16,23 +16,24 @@ import json
 # =============================================================================
 # Initial Configs
 # =============================================================================
-img_height,img_width,img_channel=101,101,2 # image dimensions
+img_height,img_width,img_channel=101,101,3 # image dimensions
 numOfInputConvFilters=32 # number of input conv filters
-pre_train=True # use previous weights or start from scratch
+pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
-test_size=0.1 # portion of data to be used for local test during training
+test_size=0.2 # portion of data to be used for local test during training
 stratifyEnable=False # when spliting data into train-test, stratify or not?
 projectStage="0" 
-agileIterationNum="6" # iteration number
+agileIterationNum="8" # iteration number
 seed = 2018 # fix random seed for reproducibility
-initialLearningRate=5e-5
+initialLearningRate=1e-4
 nonZeroMasksOnly=False # only for segmentation
 binaryThreshold=0.5
 maskThreshold=0.5
 showModelSummary=False
 nbepoch=300
-largeMaskThreshold=1
+largeMaskThreshold=0
 balanceDataFlag=True
+addDepthFlag=True
 np.random.seed(seed)
 
 
@@ -52,6 +53,7 @@ pre_settings["binaryThreshold"]=binaryThreshold
 pre_settings["maskThreshold"]=maskThreshold
 pre_settings["largeMaskThreshold"]=largeMaskThreshold
 pre_settings["balanceDataFlag"]=balanceDataFlag
+pre_settings["addDepthFlag"]=addDepthFlag
 pre_settings["c"]="continue"
 pre_settings["e"]="Exit!"
 
@@ -229,8 +231,8 @@ if configsDF is None:
     augmentationParams = dict(samplewise_center=False,
                               samplewise_std_normalization=False,
                          rotation_range=5,
-                         width_shift_range=0.1,
-                         height_shift_range=0.1,
+                         width_shift_range=0.05,
+                         height_shift_range=0.05,
                          zoom_range=0.05,
                          shear_range=0.1,
                          horizontal_flip=True,
@@ -282,7 +284,8 @@ if configsDF is None:
             #'optimizer': 'Adam',
             'optimizer': 'Nadam',
             #'loss': 'categorical_crossentropy',
-            'loss': 'binary_crossentropy',
+            #'loss': 'binary_crossentropy',
+            'loss': 'focal_loss',
             #"loss": "custom",
             'nbepoch': nbepoch,
             'numOfOutputs': 1,

@@ -5,7 +5,6 @@ import os
 os.environ['KERAS_BACKEND'] = 'theano'
 
 import numpy as np
-#import collections
 import pandas as pd
 from utils import utils_config
 #import utils_config
@@ -16,24 +15,26 @@ import json
 # =============================================================================
 # Initial Configs
 # =============================================================================
-img_height,img_width,img_channel=101,101,1 # image dimensions
+projectStage="0" 
+agileIterationNum="8" # iteration number
+
+img_height,img_width,img_channel=101,101,3 # image dimensions
 #img_height,img_width,img_channel=128,128,1 # image dimensions
 numOfInputConvFilters=48 # number of input conv filters
-pre_train=True # use previous weights or start from scratch
+pre_train=False # use previous weights or start from scratch
 nFolds=5 # number of folds for training
 test_size=0.1 # portion of data to be used for local test during training
-stratifyEnable=False # when spliting data into train-test, stratify or not?
-projectStage="0" 
-agileIterationNum="7" # iteration number
+stratifyEnable=True # when spliting data into train-test, stratify or not?
 seed = 2018 # fix random seed for reproducibility
-initialLearningRate=5e-5
-nonZeroMasksOnly=True
+initialLearningRate=1e-4
+nonZeroMasksOnly=False
 showModelSummary=False
-numOfEpochs=300
+numOfEpochs=500
 maskThreshold=0.5
 binaryThreshold=0.5
-largeMaskThreshold=1
+largeMaskThreshold=0
 histeq=False
+addDepthFlag=True
 #padSize=(13,14) # to make image size 128*128
 padSize=(0,0) # no zero padding
 np.random.seed(seed)

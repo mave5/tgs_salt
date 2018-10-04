@@ -7,7 +7,8 @@ import numpy as np
 import matplotlib.pylab as plt
 import cv2
 import time
-from utils import models
+#from utils import models
+from utils.models  import createModel
 from sklearn.model_selection import ShuffleSplit
 from sklearn.model_selection import StratifiedShuffleSplit
 import pandas as pd
@@ -16,6 +17,33 @@ from glob import glob
 from keras.models import load_model
 # elastic augmentation
 #from scipy.ndimage.filters import gaussian_filter
+
+
+def add_depth_channels(image):
+    c,h, w = image.shape
+    image_tensor=np.zeros((3,h,w),"float32")
+    if c==1:
+        image_tensor[0]=image        
+        for row, const in enumerate(np.linspace(0, 1, h)):
+            image_tensor[1, row, :] = const
+        image_tensor[2] = image_tensor[0] * image_tensor[1]
+    else:        
+        image_tensor[:2]=image    
+        for row, const in enumerate(np.linspace(0, 1, h)):
+            image_tensor[2, row, :] = const
+        #image_tensor[2] = image_tensor[0] * image_tensor[1]
+    return image_tensor
+
+def addDepthToX(X,addDepthFlag):
+    if addDepthFlag is False:
+        return X
+    n,c,h,w=X.shape
+    X_with_d=np.zeros((n,3,h,w),"float32")
+    
+    for i in range(n):
+        X_with_d[i]=add_depth_channels(X[i])
+    return X_with_d
+
 
 def separateLargeMasks(X,Y,configs):
     if configs.nonZeroMasksOnly:
@@ -815,12 +843,37 @@ def runLengthEncoding(img, order='F', format=True):
         return runs
     
 
-def createModel(configs,showModelSummary=False):
-    model = getattr(models, configs.model_type)(configs.trainingParams)
-    
-    if showModelSummary:
-        model.summary()
-    return model
+#def createModel(configs,showModelSummary=False):
+#    model = getattr(models, configs.model_type)(configs.trainingParams)
+#    
+#    optimizer=configs.trainingParams["optimizer"]
+#    if optimizer=='RMSprop':
+#        optimizer = RMSprop(lr)
+#    elif optimizer=='Adam':       
+#        optimizer = Adam(lr)
+#    elif optimizer=='Nadam':       
+#        optimizer = Nadam(lr,clipvalue=1.0)        
+#
+#    if loss=='dice':
+#        model.compile(optimizer=optimizer, loss=dice_coef_loss, metrics=[dice_coef])
+#    elif loss=="custom":
+#        model.compile(loss=loss_combined, optimizer=optimizer)
+#    elif loss=="averagePrecision":
+#        model.compile(loss=averagePrecision_loss, optimizer=optimizer)
+#    elif loss=="iou_loss":
+#        model.compile(loss=iou_loss, optimizer=optimizer)
+#    elif loss=="customCategorical":
+#        customCategorical=customLosses.customCategoricalCrossEntropy()
+#        model.compile(loss=customCategorical, optimizer=optimizer)
+#    else:
+#        model.compile(loss=loss, optimizer=optimizer)
+#
+#    
+#    if showModelSummary:
+#        model.summary()
+#        
+#        
+#    return model
 
 
 def balance_data(X,y):
@@ -921,9 +974,24 @@ def trainNfolds_classification(X,Y,configs,masks=None):
 
 
 
+
+def getCoverag(Y):    
+    area=np.sum(Y,axis=(1,2,3))*1.0
+    area/=(Y.shape[2]*Y.shape[3])
+    coverageY=np.round(area*10,)
+    
+    return coverageY.astype("int")     
+
 def trainNfolds(X,Y,configs):
     nFolds=configs.nFolds
-    skf = ShuffleSplit(n_splits=nFolds, test_size=configs.test_size, random_state=321)
+    coverageY=getCoverag(Y)
+    if configs.stratifyEnable is True:
+        print ("stratify with coverage!")
+        print("coverages: %s" %coverageY)
+        skf = StratifiedShuffleSplit(n_splits=nFolds, test_size=configs.test_size, random_state=321)
+    else:
+        skf = ShuffleSplit(n_splits=nFolds, test_size=configs.test_size, random_state=321)
+    
     
     # loop over folds
     foldnm=0
@@ -933,7 +1001,7 @@ def trainNfolds(X,Y,configs):
     maskThreshold=configs.maskThreshold
     
     print ('wait ...')
-    for train_ind, test_ind in skf.split(X,Y):
+    for train_ind, test_ind in skf.split(X,coverageY):
         foldnm+=1    
     
         train_ind=list(np.sort(train_ind))
@@ -2052,6 +2120,7 @@ def load_data_classify_prob_largeMaskThreshold(configs,data_type="train"):
     sumY=np.sum(Y,axis=(1,2,3))
     y=(sumY>configs.largeMaskThreshold)
     
+    X=addDepthToX(X,configs.addDepthFlag)
     
     return X,y,ids,Y
 
@@ -2190,6 +2259,7 @@ def load_data(configs,data_type="train"):
         X=data["X"]
         Y=data["Y"]
         ids=data["ids"]
+        X=addDepthToX(X,configs.addDepthFlag)
         return X,Y.astype("uint8"),ids
     
     if data_type=="train":
@@ -2223,7 +2293,7 @@ def load_data(configs,data_type="train"):
     X=data["X"]
     Y=data["Y"]
     ids=data["ids"]
-    
+    X=addDepthToX(X,configs.addDepthFlag)
     return X,Y.astype("uint8"),ids
 
 def data_resize(X,Y,h,w):

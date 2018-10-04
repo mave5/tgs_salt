@@ -23,7 +23,7 @@ if not os.path.exists(path2predictions):
 # =============================================================================
 # list of experiments to be ensembled
 # =============================================================================
-experiments=["0.3.7","0.3.11","0.5.3","0.6.10","0.6.14","0.6.16"]
+experiments=["0.3.7","0.3.11","0.5.3","0.6.10","0.6.14","0.6.16","0.7.2","0.7.4","0.7.6"]
 experimentsJoin="".join("_"+e for e in experiments)
 
 Y_pred_ensemble=utils_train_test.getOutputEnsemble_evalMetric(path2allExperiments,experiments,data_type="train",path2data=path2data)    
