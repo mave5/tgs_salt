@@ -34,7 +34,7 @@ maskThreshold=0.5
 binaryThreshold=0.5
 largeMaskThreshold=0
 histeq=False
-addDepthFlag=True
+addDepthFlag=False
 #padSize=(13,14) # to make image size 128*128
 padSize=(0,0) # no zero padding
 np.random.seed(seed)

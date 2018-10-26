@@ -1230,13 +1230,13 @@ def model_classification_skip2(params):
     model = Model(inputs=xin, outputs=output)
 
     
-    if optimizer=='RMSprop':
-        optimizer = RMSprop(lr)
-    elif optimizer=='Adam':       
-        optimizer = Adam(lr)
-    elif optimizer=='Nadam':       
-        optimizer = Nadam(lr,clipvalue=1.0)        
-    model.compile(loss=loss, optimizer=optimizer)
+#    if optimizer=='RMSprop':
+#        optimizer = RMSprop(lr)
+#    elif optimizer=='Adam':       
+#        optimizer = Adam(lr)
+#    elif optimizer=='Nadam':       
+#        optimizer = Nadam(lr,clipvalue=1.0)        
+#    model.compile(loss=loss, optimizer=optimizer)
 
     return model
 
@@ -1310,13 +1310,13 @@ def model_classification_skip3(params):
     model = Model(inputs=xin, outputs=output)
 
     
-    if optimizer=='RMSprop':
-        optimizer = RMSprop(lr)
-    elif optimizer=='Adam':       
-        optimizer = Adam(lr)
-    elif optimizer=='Nadam':       
-        optimizer = Nadam(lr,clipvalue=1.0)        
-    model.compile(loss=loss, optimizer=optimizer)
+#    if optimizer=='RMSprop':
+#        optimizer = RMSprop(lr)
+#    elif optimizer=='Adam':       
+#        optimizer = Adam(lr)
+#    elif optimizer=='Nadam':       
+#        optimizer = Nadam(lr,clipvalue=1.0)        
+#    model.compile(loss=loss, optimizer=optimizer)
 
     return model
 
@@ -1381,13 +1381,13 @@ def model_classification_skip4(params):
     model = Model(inputs=xin, outputs=output)
 
     
-    if optimizer=='RMSprop':
-        optimizer = RMSprop(lr)
-    elif optimizer=='Adam':       
-        optimizer = Adam(lr)
-    elif optimizer=='Nadam':       
-        optimizer = Nadam(lr,clipvalue=1.0)        
-    model.compile(loss=loss, optimizer=optimizer)
+#    if optimizer=='RMSprop':
+#        optimizer = RMSprop(lr)
+#    elif optimizer=='Adam':       
+#        optimizer = Adam(lr)
+#    elif optimizer=='Nadam':       
+#        optimizer = Nadam(lr,clipvalue=1.0)        
+#    model.compile(loss=loss, optimizer=optimizer)
 
     return model
 
